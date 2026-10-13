@@ -5,6 +5,7 @@ int test_failures;
 void test_brain(void);
 void test_gfx(void);
 void test_render(void);
+void test_scene(void);
 void test_sky(void);
 void test_light(void);
 void test_species(void);
@@ -28,6 +29,7 @@ int main(void)
     test_tank_social();
     test_tank_depth();
     test_app();
+    test_scene();
     test_render();
 
     if (test_failures) {

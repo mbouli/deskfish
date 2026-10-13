@@ -45,15 +45,28 @@ void test_assets(void)
         CHECK(k > 0 && k < 16 * 16); /* some transparent, some fish */
     }
 
-    CHECK(asset_back.w == DISPLAY_W && asset_back.h == 192);
-    CHECK(keyed(&asset_back) == 0); /* fully opaque */
-
     CHECK(asset_front.w == DISPLAY_W && asset_front.h == 192);
     int k = keyed(&asset_front);
     CHECK(k > 0 && k < DISPLAY_W * 192);
 
     test_front_mask();
 
-    CHECK(asset_water != GFX_KEY);
-    CHECK(asset_water == asset_back.px[0]); /* the top band continues the art's sky colour */
+    CHECK(asset_sand.w == DISPLAY_W && asset_sand.h == 192);
+    int sand_clear = keyed(&asset_sand);
+    CHECK(sand_clear > 0 && sand_clear < DISPLAY_W * 192); /* sand below, open sky above */
+
+    /* The distant ruins' outline: some of the picture, not all, and none of
+     * the top rows, which are open sky. */
+    int ruin = 0, ruin_top = 0;
+    for (int y = 0; y < 192; y++) {
+        for (int x = 0; x < DISPLAY_W; x++) {
+            int bit = (asset_far_mask[y][x >> 3] >> (x & 7)) & 1;
+            ruin += bit;
+            ruin_top += bit && y < 4;
+        }
+    }
+    CHECK(ruin > 1000 && ruin < DISPLAY_W * 192);
+    CHECK(ruin_top == 0);
+
+    CHECK(asset_water == RGB565(62, 121, 221));
 }

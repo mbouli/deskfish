@@ -9,6 +9,7 @@
 #include "display.h"
 #include "light.h"
 #include "render.h"
+#include "scene.h"
 #include "sim.h"
 #include "sky.h"
 #include "tank.h"
@@ -103,6 +104,11 @@ static int run_headless(uint32_t seed, long ticks, int64_t unix_utc, const char 
     print_sky(unix_utc, &sky, &light);
     print_fish(&tank);
     if (snapshot != NULL) {
+        if (!scene_init()) {
+            fprintf(stderr, "out of memory\n");
+            return 1;
+        }
+        scene_relight(&light);
         render_tank(&tank, fb);
         return write_snapshot(snapshot, fb);
     }

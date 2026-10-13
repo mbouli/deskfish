@@ -1,36 +1,31 @@
 #include "render.h"
 
+#include <stddef.h>
+
 #include "assets.h"
 #include "display.h"
 #include "gfx.h"
+#include "scene.h"
 #include "tuning.h"
-
-/* The art is shorter than the screen: it sits at the bottom, under plain water. */
-static int art_top(void)
-{
-    return DISPLAY_H - asset_back.h;
-}
 
 void render_background(uint16_t *fb)
 {
-    gfx_fill_rect(fb, 0, 0, DISPLAY_W, art_top(), asset_water);
-    gfx_blit(fb, &asset_back, 0, art_top());
+    gfx_blit(fb, scene_backdrop(), 0, 0);
 }
 
 void render_fish(uint16_t *fb, species_t s, int cx, int cy, bool facing_left, int size_px)
 {
-    if ((int)s < 0 || (int)s >= SPECIES_COUNT) {
+    const image_t *sprite = scene_fish(s);
+    if (sprite == NULL) {
         return;
     }
-    gfx_blit_fit(fb, &asset_fish[s], cx - size_px / 2, cy - size_px / 2, size_px, size_px, facing_left);
+    gfx_blit_fit(fb, sprite, cx - size_px / 2, cy - size_px / 2, size_px, size_px, facing_left);
 }
 
 void render_foreground(uint16_t *fb)
 {
-    gfx_blit_keyed(fb, &asset_front, 0, art_top(), 1, false);
+    gfx_blit_keyed(fb, scene_front(), 0, DISPLAY_H - scene_front()->h, 1, false);
 }
-
-#define PELLET_COLOUR RGB565(214, 170, 96)
 
 static void draw_fish_layer(const tank_t *t, bool front, uint16_t *fb)
 {
@@ -56,7 +51,7 @@ void render_tank(const tank_t *t, uint16_t *fb)
     for (int i = 0; i < TANK_PELLETS; i++) {
         const pellet_t *p = &t->pellets[i];
         if (p->alive) {
-            gfx_fill_rect(fb, (int)(p->x + 0.5f) - 1, (int)(p->y + 0.5f) - 1, 3, 3, PELLET_COLOUR);
+            gfx_fill_rect(fb, (int)(p->x + 0.5f) - 1, (int)(p->y + 0.5f) - 1, 3, 3, scene_pellet());
         }
     }
 }

@@ -2,7 +2,9 @@
 
 #include "assets.h"
 #include "display.h"
+#include "light.h"
 #include "render.h"
+#include "scene.h"
 #include "tank_helpers.h"
 #include "test.h"
 
@@ -13,8 +15,19 @@ static uint16_t at(const uint16_t *fb, int x, int y)
     return fb[y * DISPLAY_W + x];
 }
 
+/* Light the scene as plain midday, so drawing tests see the art as drawn. */
+static void midday(void)
+{
+    sky_t noon = {.sun_alt_deg = 60.0f, .sun_up = true, .progress = 0.5f, .moon_phase = 0.5f};
+    light_t light;
+    light_compute(&noon, &light);
+    CHECK(scene_init());
+    scene_relight(&light);
+}
+
 static void test_pellet_is_drawn(void)
 {
+    midday();
     uint16_t *fb = malloc(DISPLAY_W * DISPLAY_H * sizeof(uint16_t));
     tank_t t;
     tank_init(&t, 1);
@@ -23,17 +36,17 @@ static void test_pellet_is_drawn(void)
     }
 
     render_tank(&t, fb);
-    CHECK(at(fb, 50, 30) == asset_water); /* open water, above the art */
+    CHECK(at(fb, 50, 30) == scene_backdrop()->px[30 * DISPLAY_W + 50]); /* open water, above the art */
 
     t.pellets[3] = (pellet_t){.alive = true, .x = 50, .y = 30};
     render_tank(&t, fb);
     CHECK(at(fb, 50, 30) == PELLET_COLOUR);
     CHECK(at(fb, 49, 29) == PELLET_COLOUR && at(fb, 51, 31) == PELLET_COLOUR); /* 3x3 */
-    CHECK(at(fb, 52, 30) == asset_water);
+    CHECK(at(fb, 52, 30) == scene_backdrop()->px[30 * DISPLAY_W + 52]);
 
     t.pellets[3].alive = false;
     render_tank(&t, fb);
-    CHECK(at(fb, 50, 30) == asset_water);
+    CHECK(at(fb, 50, 30) == scene_backdrop()->px[30 * DISPLAY_W + 50]);
 
     /* A pellet at the very edge must not write outside the buffer. */
     t.pellets[0] = (pellet_t){.alive = true, .x = 0, .y = 0};
@@ -62,6 +75,7 @@ static void changed_box(const uint16_t *a, const uint16_t *b, int *x0, int *x1, 
 
 static void test_layers_and_sizes(void)
 {
+    midday();
     uint16_t *empty = malloc(DISPLAY_W * DISPLAY_H * sizeof(uint16_t));
     uint16_t *fb = malloc(DISPLAY_W * DISPLAY_H * sizeof(uint16_t));
     tank_t t;

@@ -3,6 +3,7 @@
 #include "clock.h"
 #include "display.h"
 #include "render.h"
+#include "scene.h"
 #include "touch.h"
 #include "tuning.h"
 
@@ -28,6 +29,7 @@ static void relight(void)
     const place_t place = {PLACE_LAT_DEG, PLACE_LON_DEG};
     sky_compute(app_sky_time(), place, &sky);
     light_compute(&sky, &light);
+    scene_relight(&light);
     relights++;
 }
 
@@ -37,7 +39,7 @@ bool app_init(uint32_t seed)
     last_ms = clock_millis();
     owed_ms = 0;
     lit = false; /* light it on the first frame */
-    return true;
+    return scene_init();
 }
 
 void app_set_speed(int multiplier)

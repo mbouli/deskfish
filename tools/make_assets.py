@@ -68,14 +68,29 @@ def main():
         parts.append(c_array(f"fish_{name.lower()}_px", pixels(sprite, keyed=True)))
         parts.append("")
 
-    far = tiled(Image.open(BG_DIR / "far.png"), SCREEN_W)
+    far = tiled(Image.open(BG_DIR / "far.png"), SCREEN_W).convert("RGB")
     sand = tiled(Image.open(BG_DIR / "sand.png"), SCREEN_W)
-    back = Image.alpha_composite(far, sand)
     front = Image.open(BG_DIR / "foregound-merged.png").convert("RGBA").crop((0, 0, SCREEN_W, far.height))
-    assert back.size == front.size == (SCREEN_W, 192)
+    assert far.size == sand.size == front.size == (SCREEN_W, 192)
 
-    back_px = pixels(back, keyed=False)
-    parts.append(c_array("back_px", back_px))
+    # The far layer has two colours: open water, and the distant ruins. Only
+    # the ruins' outline is kept; their colour comes from the sky at run time.
+    water = far.getpixel((0, 0))
+    assert len(far.getcolors()) == 2, "far.png is expected to have exactly two colours"
+    parts.append(f"const uint8_t asset_far_mask[192][{SCREEN_W // 8}] = {{")
+    for y in range(far.height):
+        row = []
+        for x0 in range(0, SCREEN_W, 8):
+            byte = 0
+            for bit in range(8):
+                if far.getpixel((x0 + bit, y)) != water:
+                    byte |= 1 << bit
+            row.append(f"0x{byte:02X}")
+        parts.append("    {" + ", ".join(row) + "},")
+    parts.append("};")
+    parts.append("")
+
+    parts.append(c_array("sand_px", pixels(sand, keyed=True)))
     parts.append("")
     parts.append(c_array("front_px", pixels(front, keyed=True)))
     parts.append("")
@@ -98,9 +113,9 @@ def main():
     for name in SPECIES:
         parts.append(f"    [SPECIES_{name.upper()}] = {{16, 16, fish_{name.lower()}_px}},")
     parts.append("};")
-    parts.append(f"const image_t asset_back = {{{SCREEN_W}, 192, back_px}};")
+    parts.append(f"const image_t asset_sand = {{{SCREEN_W}, 192, sand_px}};")
     parts.append(f"const image_t asset_front = {{{SCREEN_W}, 192, front_px}};")
-    parts.append(f"const uint16_t asset_water = 0x{back_px[0]:04X};")
+    parts.append(f"const uint16_t asset_water = 0x{rgb565(*water):04X};")
     parts.append("")
 
     OUT.write_text("\n".join(parts))

@@ -6,7 +6,10 @@
 /* Defined in assets_data.c, which tools/make_assets.py generates. */
 
 extern const image_t asset_fish[SPECIES_COUNT]; /* 16x16, keyed, facing right */
-extern const image_t asset_back;                /* 320x192, opaque: far ruins and sand */
+extern const image_t asset_sand;                /* 320x192, keyed: the sea floor */
+/* 320x192, one bit per pixel, least significant bit first: 1 where the distant
+ * ruins are. They are drawn as the sky behind them, slightly darker. */
+extern const uint8_t asset_far_mask[192][DISPLAY_W / 8];
 extern const image_t asset_front;               /* 320x192, keyed: rocks and kelp */
 extern const uint16_t asset_water;              /* the plain colour above the art */
 
