@@ -104,11 +104,18 @@ static void test_school(void)
     percept_t p = calm();
     p.social = 5;
     p.friend_ = DIST_FAR;
-    CHECK(brain_choose(&p) == GOAL_SCHOOL);
+    CHECK(brain_choose(&p) == GOAL_SCHOOL); /* a long way from anyone: go and join someone */
     p.social = 4;
     CHECK(brain_choose(&p) != GOAL_SCHOOL);
     p.social = 9;
     p.friend_ = DIST_NONE;
+    CHECK(brain_choose(&p) != GOAL_SCHOOL);
+
+    /* Still some way off: keep closing in... */
+    p.friend_ = DIST_MID;
+    CHECK(brain_choose(&p) == GOAL_SCHOOL);
+    /* ...but once close, stop shadowing and do its own thing. */
+    p.friend_ = DIST_NEAR;
     CHECK(brain_choose(&p) != GOAL_SCHOOL);
 }
 
@@ -125,7 +132,7 @@ static void test_priority_order(void)
     p.food = DIST_NEAR;
     p.night = true;
     p.social = 9;
-    p.friend_ = DIST_NEAR;
+    p.friend_ = DIST_FAR;
     CHECK(brain_choose(&p) == GOAL_FLEE);
 
     p.startled = false;

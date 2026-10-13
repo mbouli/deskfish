@@ -29,7 +29,10 @@ goal_t brain_choose(const percept_t *p)
         (p->current == GOAL_REST && p->energy < RESTED_ENERGY_MIN)) {
         return GOAL_REST;
     }
-    if (p->social >= SOCIAL_MIN && p->friend_ != DIST_NONE) {
+    /* A sociable fish heads for the nearest fish until it is close, then does
+     * its own thing until it drifts off again. That keeps a group loose
+     * instead of nose to tail. */
+    if (p->social >= SOCIAL_MIN && (p->friend_ == DIST_MID || p->friend_ == DIST_FAR)) {
         return GOAL_SCHOOL;
     }
     return GOAL_WANDER;
