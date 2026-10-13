@@ -361,7 +361,7 @@ static void update_needs(tank_t *t, fish_t *f)
     if (f->goal == GOAL_REST) {
         f->energy += ENERGY_REST_PER_TICK;
     } else {
-        f->energy -= ENERGY_DRAIN_PER_TICK;
+        f->energy -= ENERGY_DRAIN_PER_TICK * (t->night ? ENERGY_NIGHT_FACTOR : 1.0f);
     }
     f->stress -= STRESS_DECAY_PER_TICK;
     if (t->touching && f->bold <= SHY_BOLD_MAX &&
@@ -506,6 +506,52 @@ static bool body_hide(tank_t *t, fish_t *f, steer_t *s)
     return true;
 }
 
+static bool body_school(tank_t *t, int self, steer_t *s)
+{
+    fish_t *f = &t->fish[self];
+    float d = 0.0f;
+    int i = nearest_friend(t, self, &d);
+    if (i < 0) {
+        return false;
+    }
+    const fish_t *friend_ = &t->fish[i];
+    if (d > SCHOOL_GAP_PX + SCHOOL_BAND_PX) {
+        steer_to(f, friend_->x, friend_->y, SCHOOL_SPEED, 0.0f, s); /* catch up */
+        return true;
+    }
+    /* Close enough: go where the friend is going. A friend that is barely
+     * moving is no use as a guide, so wander instead and let it follow us. */
+    if (sqrtf(friend_->vx * friend_->vx + friend_->vy * friend_->vy) < SCHOOL_MIN_FRIEND_SPEED) {
+        return false;
+    }
+    s->vx = friend_->vx;
+    s->vy = friend_->vy;
+    return true;
+}
+
+/* A push away from any fish that is too close, on top of what the goal wants. */
+static void separate(const tank_t *t, int self, steer_t *s)
+{
+    const fish_t *f = &t->fish[self];
+    for (int i = 0; i < TANK_FISH; i++) {
+        if (i == self) {
+            continue;
+        }
+        float dx = f->x - t->fish[i].x, dy = f->y - t->fish[i].y;
+        float d = sqrtf(dx * dx + dy * dy);
+        if (d >= SEPARATION_PX) {
+            continue;
+        }
+        float push = (1.0f - d / SEPARATION_PX) * SEPARATION_PUSH;
+        if (d < 0.001f) { /* exactly on top of each other: split by who came first */
+            s->vx += self < i ? -push : push;
+            continue;
+        }
+        s->vx += dx / d * push;
+        s->vy += dy / d * push;
+    }
+}
+
 static void steer(tank_t *t, int i, steer_t *s)
 {
     fish_t *f = &t->fish[i];
@@ -517,6 +563,9 @@ static void steer(tank_t *t, int i, steer_t *s)
         break;
     case GOAL_REST:
         done = body_rest(t, f, s);
+        break;
+    case GOAL_SCHOOL:
+        done = body_school(t, i, s);
         break;
     case GOAL_FLEE:
         done = body_flee(t, f, s);
@@ -533,6 +582,9 @@ static void steer(tank_t *t, int i, steer_t *s)
     if (!done) {
         s->gain = STEER_GAIN;
         body_wander(t, f, s);
+    }
+    if (f->goal != GOAL_HIDE) { /* a hiding fish holds its spot, even if it has company */
+        separate(t, i, s);
     }
 }
 

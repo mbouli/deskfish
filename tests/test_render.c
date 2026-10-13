@@ -43,7 +43,34 @@ static void test_pellet_is_drawn(void)
     free(fb);
 }
 
+static void test_night_is_dimmed(void)
+{
+    uint16_t *day = malloc(DISPLAY_W * DISPLAY_H * sizeof(uint16_t));
+    uint16_t *night = malloc(DISPLAY_W * DISPLAY_H * sizeof(uint16_t));
+    tank_t t;
+    tank_init(&t, 1);
+    t.pellets[0] = (pellet_t){.alive = true, .x = 50, .y = 30};
+
+    render_tank(&t, NOON, day);
+    render_tank(&t, 0, night);
+    bool every_pixel_halved = true;
+    for (int i = 0; i < DISPLAY_W * DISPLAY_H; i++) {
+        every_pixel_halved = every_pixel_halved && night[i] == ((day[i] >> 1) & 0x7BEF);
+    }
+    CHECK(every_pixel_halved);
+    CHECK(at(night, 0, 0) != at(day, 0, 0));
+
+    render_tank(&t, DAY_START_MIN, night); /* 06:00 is day */
+    CHECK(at(night, 0, 0) == at(day, 0, 0));
+    render_tank(&t, NIGHT_START_MIN, night); /* 20:00 is night */
+    CHECK(at(night, 0, 0) != at(day, 0, 0));
+
+    free(day);
+    free(night);
+}
+
 void test_render(void)
 {
     test_pellet_is_drawn();
+    test_night_is_dimmed();
 }

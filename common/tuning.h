@@ -87,4 +87,4 @@
 #define SCHOOL_MIN_FRIEND_SPEED 5.0f  /* a friend slower than this is not worth following */
 
 #define SEPARATION_PX 22.0f           /* closer than this, fish push apart */
-#define SEPARATION_PUSH 25.0f
+#define SEPARATION_PUSH 45.0f
