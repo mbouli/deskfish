@@ -11,7 +11,9 @@ idf_component_register(SRCS "main.c" "display.c" "touch.c" "clock.c" "wifi_time.
                             "../../common/sky.c"
                             "../../common/species.c"
                             "../../common/tank.c"
-                       INCLUDE_DIRS "." "../../common")
+                       INCLUDE_DIRS "." "../../common"
+                       # The model the fish listen to, copied into the firmware as it is.
+                       EMBED_FILES "../../model/out/deskfish_model.bin")
 
 # The moment of this build, in seconds since 1970, for the clock's fallback.
 string(TIMESTAMP BUILD_EPOCH "%s" UTC)
