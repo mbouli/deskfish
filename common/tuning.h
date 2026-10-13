@@ -21,8 +21,12 @@
 #define DEPTH_BOTTOM_MIN 150.0f
 #define DEPTH_BOTTOM_MAX 200.0f
 
-/* --- Time of day -------------------------------------------------------- */
+/* --- Where in the world the tank is ------------------------------------- */
 
+#define PLACE_LAT_DEG 32.61f  /* Auburn, Alabama. North is positive. */
+#define PLACE_LON_DEG (-85.48f) /* East is positive. */
+
+/* Kept until Task 2 replaces the fixed schedule with the real sun. */
 #define DAY_START_MIN (6 * 60)
 #define NIGHT_START_MIN (20 * 60)
 

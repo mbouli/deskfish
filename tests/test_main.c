@@ -5,6 +5,8 @@ int test_failures;
 void test_brain(void);
 void test_gfx(void);
 void test_render(void);
+void test_sky(void);
+void test_light(void);
 void test_species(void);
 void test_assets(void);
 void test_tank(void);
@@ -15,6 +17,8 @@ void test_app(void);
 
 int main(void)
 {
+    test_sky();
+    test_light();
     test_brain();
     test_gfx();
     test_species();
