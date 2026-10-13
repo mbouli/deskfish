@@ -18,6 +18,7 @@ void test_tank_social(void);
 void test_tank_depth(void);
 void test_tank_mood(void);
 void test_app(void);
+void test_signs(void);
 
 int main(void)
 {
@@ -37,6 +38,7 @@ int main(void)
     test_app();
     test_scene();
     test_render();
+    test_signs();
 
     if (test_failures) {
         printf("%d check(s) FAILED\n", test_failures);
