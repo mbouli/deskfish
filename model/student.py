@@ -130,6 +130,25 @@ def answer(model, tok, state):
     return tok.words[written[0]], tok.words[written[1]]
 
 
+@torch.no_grad()
+def constrained_answer(model, tok, state):
+    """As answer(), but choosing only among real goals, then only among real moods.
+
+    This is exactly what the C code on the board does.
+    """
+    model.eval()
+    device = next(model.parameters()).device
+    goal_ids = [tok.words.index(w) for w in schema.GOALS]
+    mood_ids = [tok.words.index(w) for w in schema.MOODS]
+    tokens = torch.tensor([[tok.bos] + tok.encode(state) + [tok.sep]], device=device)
+    scores = model(tokens)[0, -1]
+    goal = goal_ids[scores[goal_ids].argmax().item()]
+    tokens = torch.cat([tokens, torch.tensor([[goal]], device=device)], dim=1)
+    scores = model(tokens)[0, -1]
+    mood = mood_ids[scores[mood_ids].argmax().item()]
+    return tok.words[goal], tok.words[mood]
+
+
 def save(model, path, extra=None):
     torch.save({"config": asdict(model.config), "weights": model.state_dict(),
                 "schema": schema.SCHEMA_VERSION, "extra": extra or {}}, path)
