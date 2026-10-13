@@ -1,37 +1,57 @@
 #include "app.h"
 
+#include "clock.h"
 #include "display.h"
 #include "render.h"
 
-/* A still line-up of the starting cast; Task 3 replaces this with the tank. */
-static const struct {
-    species_t species;
-    int x, y;
-    bool facing_left;
-} line_up[] = {
-    {SPECIES_CLOWNFISH, 160, 110, false},
-    {SPECIES_GOLDFISH, 90, 90, false},
-    {SPECIES_PUFFERFISH, 235, 130, true},
-    {SPECIES_CATFISH, 70, 185, false},
-    {SPECIES_ANGELFISH, 250, 70, true},
-};
+#define MAX_TICKS_PER_FRAME 3
+
+static tank_t tank;
+static uint32_t last_ms;
+static uint32_t owed_ms; /* tank time not yet run */
+static int speed = 1;
 
 void app_init(uint32_t seed)
 {
-    (void)seed;
+    tank_init(&tank, seed);
+    last_ms = clock_millis();
+    owed_ms = 0;
 }
 
-void app_draw(uint16_t *fb)
+void app_set_speed(int multiplier)
 {
-    render_background(fb);
-    for (unsigned i = 0; i < sizeof(line_up) / sizeof(line_up[0]); i++) {
-        render_fish(fb, line_up[i].species, line_up[i].x, line_up[i].y, line_up[i].facing_left);
-    }
-    render_foreground(fb);
+    speed = multiplier < 1 ? 1 : multiplier;
+}
+
+const tank_t *app_tank(void)
+{
+    return &tank;
 }
 
 void app_frame(uint16_t *fb)
 {
-    app_draw(fb);
+    int minutes = clock_minutes();
+
+    /* Unsigned subtraction gives the right answer even when the clock wraps. */
+    uint32_t now = clock_millis();
+    uint32_t elapsed = now - last_ms;
+    last_ms = now;
+
+    /* After a long pause, do not replay the backlog: cap what we owe. */
+    uint32_t cap_ms = (uint32_t)(MAX_TICKS_PER_FRAME * TICK_MS);
+    if (elapsed > cap_ms) {
+        elapsed = cap_ms;
+    }
+    owed_ms += elapsed * (uint32_t)speed;
+    if (owed_ms > cap_ms * (uint32_t)speed) {
+        owed_ms = cap_ms * (uint32_t)speed;
+    }
+
+    while (owed_ms >= TICK_MS) {
+        tank_tick(&tank, minutes);
+        owed_ms -= TICK_MS;
+    }
+
+    render_tank(&tank, minutes, fb);
     display_push(fb, 0, 0, DISPLAY_W, DISPLAY_H);
 }

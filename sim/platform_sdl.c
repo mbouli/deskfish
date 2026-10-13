@@ -15,6 +15,7 @@ static SDL_Renderer *renderer;
 static SDL_Texture *texture;
 static bool mouse_down;
 static int mouse_x, mouse_y;
+static bool fast, restart;
 
 void display_init(void)
 {
@@ -98,6 +99,13 @@ bool sim_pump(void)
             mouse_x = event.button.x;
             mouse_y = event.button.y;
             break;
+        case SDL_KEYDOWN:
+            if (event.key.repeat == 0 && event.key.keysym.sym == SDLK_f) {
+                fast = !fast;
+            } else if (event.key.repeat == 0 && event.key.keysym.sym == SDLK_r) {
+                restart = true;
+            }
+            break;
         case SDL_MOUSEMOTION:
             mouse_x = event.motion.x;
             mouse_y = event.motion.y;
@@ -112,4 +120,16 @@ bool sim_pump(void)
 void sim_sleep_ms(uint32_t ms)
 {
     SDL_Delay(ms);
+}
+
+bool sim_fast(void)
+{
+    return fast;
+}
+
+bool sim_take_restart(void)
+{
+    bool wanted = restart;
+    restart = false;
+    return wanted;
 }
