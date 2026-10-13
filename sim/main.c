@@ -81,9 +81,9 @@ static void print_fish(const tank_t *tank)
         const fish_t *f = &tank->fish[i];
         percept_t p;
         tank_percept(tank, i, &p);
-        printf("  %-11s %-11s hunger %d energy %d stress %d | bold %d social %d | "
+        printf("  %-11s %-11s %-7s hunger %d energy %d stress %d | bold %d social %d | "
                "food %-4s friend %-4s finger %-4s cover %-4s | at %3.0f,%3.0f %s\n",
-               species_info(f->species)->name, goal_name(f->goal), p.hunger, p.energy, p.stress,
+               species_info(f->species)->name, goal_name(f->goal), mood_name(f->mood), p.hunger, p.energy, p.stress,
                p.bold, p.social, dist_name(p.food), dist_name(p.friend_), dist_name(p.finger),
                dist_name(p.cover), (double)f->x, (double)f->y, f->front ? "front" : "back");
     }
@@ -137,15 +137,15 @@ static bool parse_at(const char *text, int64_t *out)
 static FILE *trace_out;
 static long trace_lines;
 
-static goal_t tracing_brain(const percept_t *p)
+static choice_t tracing_brain(const percept_t *p)
 {
-    goal_t goal = brain_choose(p);
+    choice_t choice = brain_choose(p);
     char line[PERCEPT_TEXT_MAX];
     if (percept_encode(p, line, sizeof(line)) > 0) {
-        fprintf(trace_out, "%s -> %s calm\n", line, goal_name(goal));
+        fprintf(trace_out, "%s -> %s calm\n", line, goal_name(choice.goal));
         trace_lines++;
     }
-    return goal;
+    return choice;
 }
 
 static uint32_t trace_rng;

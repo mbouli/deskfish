@@ -386,6 +386,9 @@ static void update_needs(tank_t *t, fish_t *f)
 static void maybe_decide(tank_t *t, int i)
 {
     fish_t *f = &t->fish[i];
+    if (f->sign_ticks > 0) { /* before deciding, so a sign set this tick shows for its full time */
+        f->sign_ticks--;
+    }
     dist_t now[SEE_COUNT];
     look(t, i, now);
     bool changed = memcmp(now, f->seen, sizeof(now)) != 0;
@@ -404,9 +407,14 @@ static void maybe_decide(tank_t *t, int i)
 
     percept_t p;
     tank_percept(t, i, &p);
-    goal_t goal = t->choose(&p);
-    if ((int)goal >= 0 && (int)goal < GOAL_COUNT) {
-        f->goal = goal; /* anything else is ignored: keep the current goal */
+    choice_t c = t->choose(&p);
+    bool usable = (int)c.goal >= 0 && (int)c.goal < GOAL_COUNT && (int)c.mood >= 0 && (int)c.mood < MOOD_COUNT;
+    if (usable) { /* anything else is ignored: keep the current goal and mood */
+        f->goal = c.goal;
+        if (c.mood != f->mood) {
+            f->mood = c.mood;
+            f->sign_ticks = c.mood == MOOD_CALM ? 0 : SIGN_TICKS;
+        }
     }
     f->startled = false;
 }

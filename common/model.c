@@ -127,7 +127,6 @@ size_t model_numbers(const model_t *m)
 
 model_t *model_load(const uint8_t *data, size_t size)
 {
-    static const char *mood_words[MOOD_COUNT] = {"calm", "eager", "wary", "playful", "sleepy", "sulky"};
     reader_t r = {data, size, 0, data != NULL};
     const uint8_t *magic = take(&r, 4);
     if (magic == NULL || memcmp(magic, "DFM1", 4) != 0) {
@@ -171,7 +170,7 @@ model_t *model_load(const uint8_t *data, size_t size)
         words_ok = words_ok && m->goal_tok[g] >= 0;
     }
     for (int i = 0; i < MOOD_COUNT; i++) {
-        m->mood_tok[i] = find(m, mood_words[i]);
+        m->mood_tok[i] = find(m, mood_name((mood_t)i));
         words_ok = words_ok && m->mood_tok[i] >= 0;
     }
     if (!words_ok) {

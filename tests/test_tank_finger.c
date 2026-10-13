@@ -14,10 +14,10 @@ static float finger_distance(const tank_t *t, int f)
 
 static int startled_calls;
 
-static goal_t notice_startle(const percept_t *p)
+static choice_t notice_startle(const percept_t *p)
 {
     startled_calls += p->startled;
-    return GOAL_REST;
+    return (choice_t){GOAL_REST, MOOD_CALM};
 }
 
 static void test_startle(void)

@@ -11,7 +11,7 @@
 #define RESTED_ENERGY_MIN 6     /* stop resting at or above this */
 #define SOCIAL_MIN 5
 
-goal_t brain_choose(const percept_t *p)
+static goal_t rules(const percept_t *p)
 {
     if (p->finger == DIST_NEAR && (p->startled || p->bold <= SHY_BOLD_MAX)) {
         return GOAL_FLEE;
@@ -38,6 +38,12 @@ goal_t brain_choose(const percept_t *p)
     return GOAL_WANDER;
 }
 
+choice_t brain_choose(const percept_t *p)
+{
+    choice_t c = {rules(p), MOOD_CALM};
+    return c;
+}
+
 const char *goal_name(goal_t g)
 {
     static const char *names[GOAL_COUNT] = {
@@ -53,6 +59,22 @@ const char *goal_name(goal_t g)
         return "?";
     }
     return names[g];
+}
+
+const char *mood_name(mood_t m)
+{
+    static const char *names[MOOD_COUNT] = {
+        [MOOD_CALM] = "calm",
+        [MOOD_EAGER] = "eager",
+        [MOOD_WARY] = "wary",
+        [MOOD_PLAYFUL] = "playful",
+        [MOOD_SLEEPY] = "sleepy",
+        [MOOD_SULKY] = "sulky",
+    };
+    if ((int)m < 0 || (int)m >= MOOD_COUNT) {
+        return "?";
+    }
+    return names[m];
 }
 
 const char *dist_name(dist_t d)

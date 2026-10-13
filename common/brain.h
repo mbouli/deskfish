@@ -47,9 +47,11 @@ typedef struct {
     dist_t food, friend_, finger, cover;
 } percept_t;
 
-/* Pick a goal. Pure: the same percept always gives the same answer. */
-goal_t brain_choose(const percept_t *p);
+/* The hand-written rules. Pure: the same percept always gives the same
+ * answer. They know nothing of moods, so the mood is always calm. */
+choice_t brain_choose(const percept_t *p);
 
 /* Lower-case names for printing; "?" for a value that is not in the list. */
 const char *goal_name(goal_t g);
+const char *mood_name(mood_t m);
 const char *dist_name(dist_t d);

@@ -14,8 +14,8 @@
 /* The four things a fish keeps track of the distance to, in this order. */
 enum { SEE_FOOD, SEE_FRIEND, SEE_FINGER, SEE_COVER, SEE_COUNT };
 
-/* Anything that turns a percept into a goal: the rules now, the model later. */
-typedef goal_t (*brain_fn)(const percept_t *p);
+/* Anything that answers a percept with a goal and a mood: the rules or the model. */
+typedef choice_t (*brain_fn)(const percept_t *p);
 
 typedef struct {
     float x, y;       /* centre, in screen pixels */
@@ -34,6 +34,8 @@ typedef struct {
     float hunger, energy, stress; /* 0..9, kept as fractions so they change smoothly */
     float hunger_per_tick;        /* appetite: its species' rate, nudged per fish */
     goal_t goal;
+    mood_t mood;                  /* how it goes about its goal */
+    int sign_ticks;               /* ticks its mood sign has left to show */
     int decide_ticks;             /* ticks until the brain is next asked */
     bool startled;                /* set by a startle, cleared by the next decision */
     dist_t seen[SEE_COUNT];       /* sightings as of the last tick */

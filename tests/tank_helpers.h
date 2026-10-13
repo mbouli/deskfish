@@ -74,13 +74,24 @@ static inline void place(tank_t *t, int fish, float x, float y)
 }
 
 /* Brains that always give the same answer, for testing one body at a time. */
-static inline goal_t always_wander(const percept_t *p) { (void)p; return GOAL_WANDER; }
-static inline goal_t always_seek_food(const percept_t *p) { (void)p; return GOAL_SEEK_FOOD; }
-static inline goal_t always_rest(const percept_t *p) { (void)p; return GOAL_REST; }
-static inline goal_t always_school(const percept_t *p) { (void)p; return GOAL_SCHOOL; }
-static inline goal_t always_investigate(const percept_t *p) { (void)p; return GOAL_INVESTIGATE; }
-static inline goal_t always_flee(const percept_t *p) { (void)p; return GOAL_FLEE; }
-static inline goal_t always_hide(const percept_t *p) { (void)p; return GOAL_HIDE; }
+static inline choice_t always_wander(const percept_t *p) { (void)p; return (choice_t){GOAL_WANDER, MOOD_CALM}; }
+static inline choice_t always_seek_food(const percept_t *p) { (void)p; return (choice_t){GOAL_SEEK_FOOD, MOOD_CALM}; }
+static inline choice_t always_rest(const percept_t *p) { (void)p; return (choice_t){GOAL_REST, MOOD_CALM}; }
+static inline choice_t always_school(const percept_t *p) { (void)p; return (choice_t){GOAL_SCHOOL, MOOD_CALM}; }
+static inline choice_t always_investigate(const percept_t *p) { (void)p; return (choice_t){GOAL_INVESTIGATE, MOOD_CALM}; }
+static inline choice_t always_flee(const percept_t *p) { (void)p; return (choice_t){GOAL_FLEE, MOOD_CALM}; }
+static inline choice_t always_hide(const percept_t *p) { (void)p; return (choice_t){GOAL_HIDE, MOOD_CALM}; }
+
+/* A brain that gives whatever goal and mood a test last asked for. */
+static goal_t forced_goal;
+static mood_t forced_mood;
+static inline choice_t forced(const percept_t *p) { (void)p; return (choice_t){forced_goal, forced_mood}; }
+static inline void force(tank_t *t, goal_t g, mood_t m)
+{
+    forced_goal = g;
+    forced_mood = m;
+    tank_set_brain(t, forced);
+}
 
 /* A repeatable stream of presses, drags and releases all over the screen. */
 typedef struct {

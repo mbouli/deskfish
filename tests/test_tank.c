@@ -505,11 +505,11 @@ static void test_finger_is_seen_while_down(void)
 
 static int calls, calls_seeing_food;
 
-static goal_t counting(const percept_t *p)
+static choice_t counting(const percept_t *p)
 {
     calls++;
     calls_seeing_food += p->food != DIST_NONE;
-    return GOAL_REST; /* resting fish drift little, so sightings stay put */
+    return (choice_t){GOAL_REST, MOOD_CALM}; /* resting fish drift little, so sightings stay put */
 }
 
 static void test_fish_are_asked_in_turn_and_regularly(void)
@@ -553,10 +553,10 @@ static void test_new_sighting_forces_a_decision(void)
     CHECK(calls_seeing_food >= TANK_FISH);
 }
 
-static goal_t nonsense(const percept_t *p)
+static choice_t nonsense(const percept_t *p)
 {
     (void)p;
-    return (goal_t)42;
+    return (choice_t){(goal_t)42, MOOD_CALM};
 }
 
 static void test_bad_goal_is_ignored(void)
