@@ -16,6 +16,17 @@ typedef enum {
     GOAL_COUNT
 } goal_t;
 
+/* How it goes about it. The body in tank.c shows it. The order is schema v1's. */
+typedef enum {
+    MOOD_CALM,
+    MOOD_EAGER,
+    MOOD_WARY,
+    MOOD_PLAYFUL,
+    MOOD_SLEEPY,
+    MOOD_SULKY,
+    MOOD_COUNT
+} mood_t;
+
 /* How far away something is, roughly. */
 typedef enum { DIST_NONE, DIST_NEAR, DIST_MID, DIST_FAR } dist_t;
 

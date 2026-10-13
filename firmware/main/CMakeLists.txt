@@ -4,6 +4,7 @@ idf_component_register(SRCS "main.c" "display.c" "touch.c" "clock.c" "wifi_time.
                             "../../common/brain.c"
                             "../../common/gfx.c"
                             "../../common/light.c"
+                            "../../common/model.c"
                             "../../common/percept_text.c"
                             "../../common/render.c"
                             "../../common/scene.c"
