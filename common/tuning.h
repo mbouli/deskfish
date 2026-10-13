@@ -44,7 +44,7 @@
 #define DIST_MID_PX 120.0f
 #define DECIDE_TICKS 30               /* ask the brain every 1.5 seconds */
 #define DECIDE_STAGGER_TICKS 6        /* fish take turns */
-#define SIGN_TICKS 40                 /* a mood sign shows for 2 seconds */
+#define SIGN_TICKS 100                /* a mood sign shows for 5 seconds */
 
 /* --- The finger and food ------------------------------------------------ */
 
