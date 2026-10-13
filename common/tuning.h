@@ -87,6 +87,25 @@
 #define SCHOOL_BAND_PX 10.0f
 #define SCHOOL_MIN_FRIEND_SPEED 5.0f  /* a friend slower than this is not worth following */
 
+/* --- Moods: how a fish goes about its goal ------------------------------ */
+
+#define EAGER_SPEED 1.3f
+#define EAGER_GAIN 1.5f               /* turns harder */
+#define WARY_SPEED 0.8f
+#define WARY_SPACE_PX 40.0f           /* a wary fish pushes off from others this far out */
+#define PLAYFUL_BURST_SPEED 1.6f
+#define PLAYFUL_COAST_SPEED 0.9f
+#define PLAYFUL_PERIOD_TICKS 40       /* one burst every 2 seconds... */
+#define PLAYFUL_BURST_TICKS 12        /* ...lasting 0.6 seconds */
+#define PLAYFUL_WEAVE 0.5f            /* sideways swing, as a fraction of its speed */
+#define PLAYFUL_WEAVE_TICKS 30
+#define SLEEPY_SPEED 0.6f
+#define SLEEPY_BOB_SPEED 4.0f         /* up-and-down drift, pixels per second */
+#define SLEEPY_BOB_TICKS 60
+#define SULKY_SPEED 0.7f
+#define SULKY_SPACE_PX 60.0f          /* a sulky fish keeps this far from the others */
+#define SULKY_PUSH 30.0f
+
 /* --- Depth: in front of or behind the rocks and kelp --------------------- */
 
 #define FRONT_CHANCE 0.5f             /* how often a wandering fish picks the front layer */

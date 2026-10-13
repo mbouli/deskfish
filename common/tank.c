@@ -546,8 +546,8 @@ static bool body_school(tank_t *t, int self, steer_t *s)
     return true;
 }
 
-/* A push away from any fish that is too close, on top of what the goal wants. */
-static void separate(const tank_t *t, int self, steer_t *s)
+/* A push away from any fish nearer than `space`, on top of what the goal wants. */
+static void separate(const tank_t *t, int self, steer_t *s, float space, float push_max)
 {
     const fish_t *f = &t->fish[self];
     for (int i = 0; i < TANK_FISH; i++) {
@@ -556,16 +556,68 @@ static void separate(const tank_t *t, int self, steer_t *s)
         }
         float dx = f->x - t->fish[i].x, dy = f->y - t->fish[i].y;
         float d = sqrtf(dx * dx + dy * dy);
-        if (d >= SEPARATION_PX) {
+        if (d >= space) {
             continue;
         }
-        float push = (1.0f - d / SEPARATION_PX) * SEPARATION_PUSH;
+        float push = (1.0f - d / space) * push_max;
         if (d < 0.001f) { /* exactly on top of each other: split by who came first */
             s->vx += self < i ? -push : push;
             continue;
         }
         s->vx += dx / d * push;
         s->vy += dy / d * push;
+    }
+}
+
+/* The mood adjusts what the goal asked for. A fleeing fish is left alone. */
+static void apply_mood(const tank_t *t, int i, steer_t *s)
+{
+    const fish_t *f = &t->fish[i];
+    if (f->goal == GOAL_FLEE) {
+        return;
+    }
+    uint32_t tick = t->tick + (uint32_t)i * 7u; /* so fish in the same mood are out of step */
+    float speed = 1.0f;
+    switch (f->mood) {
+    case MOOD_EAGER:
+        speed = EAGER_SPEED;
+        s->gain *= EAGER_GAIN;
+        break;
+    case MOOD_WARY:
+        speed = WARY_SPEED;
+        break;
+    case MOOD_PLAYFUL: {
+        speed = tick % PLAYFUL_PERIOD_TICKS < PLAYFUL_BURST_TICKS ? PLAYFUL_BURST_SPEED : PLAYFUL_COAST_SPEED;
+        /* Swing from side to side across the way it is heading. */
+        float swing = sinf(6.2831853f * (float)(tick % PLAYFUL_WEAVE_TICKS) / (float)PLAYFUL_WEAVE_TICKS) * PLAYFUL_WEAVE;
+        float vx = s->vx, vy = s->vy;
+        s->vx = vx - vy * swing;
+        s->vy = vy + vx * swing;
+        break;
+    }
+    case MOOD_SLEEPY:
+        speed = SLEEPY_SPEED;
+        s->vy += sinf(6.2831853f * (float)(tick % SLEEPY_BOB_TICKS) / (float)SLEEPY_BOB_TICKS) * SLEEPY_BOB_SPEED;
+        break;
+    case MOOD_SULKY:
+        speed = SULKY_SPEED;
+        break;
+    default:
+        break;
+    }
+    s->vx *= speed;
+    s->vy *= speed;
+
+    /* Schooling fish copy each other's speed, so two in a quick mood would
+     * wind each other up without limit. Hold them to the schooling pace, as
+     * fast as the mood makes it. */
+    if (f->goal == GOAL_SCHOOL && f->mood != MOOD_CALM) {
+        float limit = SCHOOL_SPEED * speed;
+        float v = sqrtf(s->vx * s->vx + s->vy * s->vy);
+        if (v > limit) {
+            s->vx *= limit / v;
+            s->vy *= limit / v;
+        }
     }
 }
 
@@ -600,8 +652,15 @@ static void steer(tank_t *t, int i, steer_t *s)
         s->gain = STEER_GAIN;
         body_wander(t, f, s);
     }
+    apply_mood(t, i, s);
     if (f->goal != GOAL_HIDE) { /* a hiding fish holds its spot, even if it has company */
-        separate(t, i, s);
+        if (f->mood == MOOD_SULKY && f->goal != GOAL_FLEE) {
+            separate(t, i, s, SULKY_SPACE_PX, SULKY_PUSH);
+        } else if (f->mood == MOOD_WARY && f->goal != GOAL_FLEE) {
+            separate(t, i, s, WARY_SPACE_PX, SEPARATION_PUSH);
+        } else {
+            separate(t, i, s, SEPARATION_PX, SEPARATION_PUSH);
+        }
     }
 }
 
