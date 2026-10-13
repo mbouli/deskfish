@@ -8,7 +8,10 @@
 #include "touch.h"
 
 uint32_t stub_millis;
+int stub_minutes = 12 * 60;
 int stub_pushes;
+bool stub_touch_down;
+int stub_touch_x, stub_touch_y;
 
 uint32_t clock_millis(void)
 {
@@ -17,7 +20,7 @@ uint32_t clock_millis(void)
 
 int clock_minutes(void)
 {
-    return 12 * 60;
+    return stub_minutes;
 }
 
 void display_init(void)
@@ -41,7 +44,10 @@ bool touch_init(void)
 
 bool touch_read(int *x, int *y)
 {
-    (void)x;
-    (void)y;
-    return false;
+    if (!stub_touch_down) {
+        return false;
+    }
+    *x = stub_touch_x;
+    *y = stub_touch_y;
+    return true;
 }

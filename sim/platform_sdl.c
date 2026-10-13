@@ -15,7 +15,7 @@ static SDL_Renderer *renderer;
 static SDL_Texture *texture;
 static bool mouse_down;
 static int mouse_x, mouse_y;
-static bool fast, restart;
+static int last_key;
 
 void display_init(void)
 {
@@ -100,10 +100,11 @@ bool sim_pump(void)
             mouse_y = event.button.y;
             break;
         case SDL_KEYDOWN:
-            if (event.key.repeat == 0 && event.key.keysym.sym == SDLK_f) {
-                fast = !fast;
-            } else if (event.key.repeat == 0 && event.key.keysym.sym == SDLK_r) {
-                restart = true;
+            if (event.key.repeat == 0) {
+                SDL_Keycode key = event.key.keysym.sym;
+                if (key == SDLK_f || key == SDLK_r || key == SDLK_n || key == SDLK_d) {
+                    last_key = (int)key; /* SDL's letter codes are the ASCII letters */
+                }
             }
             break;
         case SDL_MOUSEMOTION:
@@ -122,14 +123,9 @@ void sim_sleep_ms(uint32_t ms)
     SDL_Delay(ms);
 }
 
-bool sim_fast(void)
+int sim_take_key(void)
 {
-    return fast;
-}
-
-bool sim_take_restart(void)
-{
-    bool wanted = restart;
-    restart = false;
-    return wanted;
+    int key = last_key;
+    last_key = 0;
+    return key;
 }

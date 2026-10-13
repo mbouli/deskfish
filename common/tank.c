@@ -11,6 +11,23 @@ static const species_t CAST[TANK_FISH] = {
     SPECIES_CLOWNFISH, SPECIES_GOLDFISH, SPECIES_PUFFERFISH, SPECIES_CATFISH, SPECIES_ANGELFISH,
 };
 
+/* Chosen where the foreground art covers most of a 32x32 fish. */
+const float tank_cover[TANK_COVERS][2] = {
+    {126.0f, 102.0f}, /* high on the big rock */
+    {136.0f, 154.0f}, /* the big rock's base */
+    {86.0f, 158.0f},  /* its left flank */
+    {228.0f, 180.0f}, /* the broken pillar */
+    {300.0f, 196.0f}, /* the statue */
+};
+
+/* What a goal's body asks for: a velocity, and how hard to turn toward it. */
+typedef struct {
+    float vx, vy;
+    float gain;
+} steer_t;
+
+/* ---- Small helpers ----------------------------------------------------- */
+
 /* xorshift32: a tiny generator that turns one number into the next. It must
  * never be given 0, which it would repeat forever. */
 static uint32_t rng_next(tank_t *t)
@@ -38,6 +55,118 @@ static int clamp_int(int v, int lo, int hi)
 {
     return v < lo ? lo : v > hi ? hi : v;
 }
+
+static float clampf(float v, float lo, float hi)
+{
+    return v < lo ? lo : v > hi ? hi : v;
+}
+
+static float distance(float ax, float ay, float bx, float by)
+{
+    float dx = ax - bx, dy = ay - by;
+    return sqrtf(dx * dx + dy * dy);
+}
+
+static bool is_night(int minutes)
+{
+    return minutes < DAY_START_MIN || minutes >= NIGHT_START_MIN;
+}
+
+/* ---- Looking around ---------------------------------------------------- */
+
+static dist_t bucket(float d)
+{
+    return d < DIST_NEAR_PX ? DIST_NEAR : d < DIST_MID_PX ? DIST_MID : DIST_FAR;
+}
+
+/* Each of these returns an index, or -1 if there is no such thing, and
+ * reports the distance through *d. */
+
+static int nearest_pellet(const tank_t *t, float x, float y, float *d)
+{
+    int best = -1;
+    for (int i = 0; i < TANK_PELLETS; i++) {
+        if (!t->pellets[i].alive) {
+            continue;
+        }
+        float di = distance(x, y, t->pellets[i].x, t->pellets[i].y);
+        if (best < 0 || di < *d) {
+            best = i;
+            *d = di;
+        }
+    }
+    return best;
+}
+
+static int nearest_friend(const tank_t *t, int self, float *d)
+{
+    int best = -1;
+    for (int i = 0; i < TANK_FISH; i++) {
+        if (i == self) {
+            continue;
+        }
+        float di = distance(t->fish[self].x, t->fish[self].y, t->fish[i].x, t->fish[i].y);
+        if (best < 0 || di < *d) {
+            best = i;
+            *d = di;
+        }
+    }
+    return best;
+}
+
+static int nearest_cover(float x, float y, float *d)
+{
+    int best = -1;
+    for (int i = 0; i < TANK_COVERS; i++) {
+        float di = distance(x, y, tank_cover[i][0], tank_cover[i][1]);
+        if (best < 0 || di < *d) {
+            best = i;
+            *d = di;
+        }
+    }
+    return best;
+}
+
+static void look(const tank_t *t, int i, dist_t seen[SEE_COUNT])
+{
+    const fish_t *f = &t->fish[i];
+    float d = 0.0f;
+    seen[SEE_FOOD] = nearest_pellet(t, f->x, f->y, &d) >= 0 ? bucket(d) : DIST_NONE;
+    seen[SEE_FRIEND] = nearest_friend(t, i, &d) >= 0 ? bucket(d) : DIST_NONE;
+    seen[SEE_FINGER] = t->touching ? bucket(distance(f->x, f->y, t->touch_x, t->touch_y)) : DIST_NONE;
+    seen[SEE_COVER] = nearest_cover(f->x, f->y, &d) >= 0 ? bucket(d) : DIST_NONE;
+}
+
+static int need_digit(float v)
+{
+    return clamp_int((int)(v + 0.5f), 0, 9);
+}
+
+void tank_percept(const tank_t *t, int fish, percept_t *out)
+{
+    memset(out, 0, sizeof(*out));
+    if (fish < 0 || fish >= TANK_FISH) {
+        return;
+    }
+    const fish_t *f = &t->fish[fish];
+    dist_t seen[SEE_COUNT];
+    look(t, fish, seen);
+
+    out->hunger = need_digit(f->hunger);
+    out->energy = need_digit(f->energy);
+    out->stress = need_digit(f->stress);
+    out->bold = f->bold;
+    out->social = f->social;
+    out->night = t->night;
+    out->startled = f->startled;
+    out->current = f->goal;
+    out->food = seen[SEE_FOOD];
+    out->friend_ = seen[SEE_FRIEND];
+    out->finger = seen[SEE_FINGER];
+    out->cover = seen[SEE_COVER];
+}
+
+/* ---- Setting up -------------------------------------------------------- */
 
 static void depth_band(depth_t depth, float *lo, float *hi)
 {
@@ -71,6 +200,7 @@ void tank_init(tank_t *t, uint32_t seed)
 {
     /* Zero everything, padding included, so two tanks can be compared byte for byte. */
     memset(t, 0, sizeof(*t));
+    t->choose = brain_choose;
     t->rng = seed != 0 ? seed : 0x9E3779B9u;
     for (int i = 0; i < 8; i++) {
         rng_next(t); /* stir, so nearby seeds do not start out alike */
@@ -85,35 +215,254 @@ void tank_init(tank_t *t, uint32_t seed)
         f->x = rng_range(t, SWIM_X_MIN, SWIM_X_MAX);
         f->y = rng_range(t, SWIM_Y_MIN, SWIM_Y_MAX);
         f->facing_left = rng_int(t, 0, 1) == 1;
+        f->hunger = rng_range(t, 2.0f, 5.0f);
+        float ticks_to_starving = (float)info->hunger_minutes * 60.0f * 1000.0f / TICK_MS;
+        f->hunger_per_tick = NEED_MAX / ticks_to_starving *
+                             rng_range(t, 1.0f - HUNGER_VARIATION, 1.0f + HUNGER_VARIATION);
+        f->energy = rng_range(t, 6.0f, 9.0f);
+        f->stress = 0.0f;
+        f->goal = GOAL_WANDER;
+        f->decide_ticks = 1 + i * DECIDE_STAGGER_TICKS; /* fish take turns */
         pick_wander_target(t, f);
+    }
+    for (int i = 0; i < TANK_FISH; i++) {
+        look(t, i, t->fish[i].seen); /* so the first tick sees no "change" */
     }
 }
 
-static void wander(tank_t *t, fish_t *f)
+void tank_set_brain(tank_t *t, brain_fn fn)
 {
-    float dx = f->tx - f->x;
-    float dy = f->ty - f->y;
-    float dist = sqrtf(dx * dx + dy * dy);
-    if (dist < WANDER_ARRIVE_PX || f->target_ticks <= 0) {
+    t->choose = fn != NULL ? fn : brain_choose;
+}
+
+/* ---- The finger -------------------------------------------------------- */
+
+void tank_set_finger(tank_t *t, bool down, int x, int y)
+{
+    if (down && !t->finger_down) {
+        if (!t->press_pending) { /* remember the first press a tick has not seen */
+            t->press_pending = true;
+            t->press_x = (float)x;
+            t->press_y = (float)y;
+        }
+    } else if (!down && t->finger_down) {
+        t->release_pending = true;
+    }
+    t->finger_down = down;
+    if (down) {
+        t->finger_x = (float)x;
+        t->finger_y = (float)y;
+    }
+}
+
+static void drop_pellet(tank_t *t, float x, float y)
+{
+    for (int i = 0; i < TANK_PELLETS; i++) {
+        pellet_t *p = &t->pellets[i];
+        if (!p->alive) {
+            /* Field by field, not a struct literal: padding must stay zero so
+             * two tanks can be compared byte for byte. */
+            memset(p, 0, sizeof(*p));
+            p->alive = true;
+            p->x = clampf(x, SWIM_X_MIN, SWIM_X_MAX);
+            p->y = clampf(y, SWIM_Y_MIN, PELLET_FLOOR_Y);
+            return;
+        }
+    }
+    /* All slots full: the tap is ignored. */
+}
+
+static void begin_touch(tank_t *t, float x, float y)
+{
+    t->touching = true;
+    t->start_x = t->touch_x = x;
+    t->start_y = t->touch_y = y;
+    t->touch_ticks = 0;
+    t->touch_moved = false;
+}
+
+static void end_touch(tank_t *t)
+{
+    if (t->touch_ticks <= TAP_MAX_TICKS && !t->touch_moved) {
+        drop_pellet(t, t->start_x, t->start_y);
+    }
+    t->touching = false;
+}
+
+static void update_finger(tank_t *t)
+{
+    bool pressed = t->press_pending;
+    bool released = t->release_pending;
+    t->press_pending = false;
+    t->release_pending = false;
+
+    if (!t->touching) {
+        if (pressed) {
+            begin_touch(t, t->press_x, t->press_y);
+        } else if (t->finger_down) {
+            begin_touch(t, t->finger_x, t->finger_y);
+        }
+    }
+    if (!t->touching) {
+        return;
+    }
+
+    t->touch_ticks++;
+    /* A press and release that both happened since the last tick was a touch
+     * at the press point; do not let a later re-press drag it elsewhere. */
+    bool whole_touch_unseen = pressed && released;
+    if (t->finger_down && !whole_touch_unseen) {
+        t->touch_x = t->finger_x;
+        t->touch_y = t->finger_y;
+    }
+    if (distance(t->touch_x, t->touch_y, t->start_x, t->start_y) >= TAP_MAX_MOVE_PX) {
+        t->touch_moved = true;
+    }
+    if (released || !t->finger_down) {
+        end_touch(t);
+    }
+}
+
+static void update_pellets(tank_t *t)
+{
+    for (int i = 0; i < TANK_PELLETS; i++) {
+        pellet_t *p = &t->pellets[i];
+        if (!p->alive) {
+            continue;
+        }
+        if (!p->settled) {
+            p->y += PELLET_SINK_SPEED * TICK_S;
+            if (p->y >= PELLET_FLOOR_Y) {
+                p->y = PELLET_FLOOR_Y;
+                p->settled = true;
+                p->settled_ticks = 0;
+            }
+        } else if (++p->settled_ticks > PELLET_LIFE_TICKS) {
+            p->alive = false;
+        }
+    }
+}
+
+/* ---- Needs and decisions ----------------------------------------------- */
+
+static void update_needs(tank_t *t, fish_t *f)
+{
+    (void)t;
+    f->hunger += f->hunger_per_tick;
+    if (f->goal == GOAL_REST) {
+        f->energy += ENERGY_REST_PER_TICK;
+    } else {
+        f->energy -= ENERGY_DRAIN_PER_TICK;
+    }
+    f->stress -= STRESS_DECAY_PER_TICK;
+
+    f->hunger = clampf(f->hunger, 0.0f, NEED_MAX);
+    f->energy = clampf(f->energy, 0.0f, NEED_MAX);
+    f->stress = clampf(f->stress, 0.0f, NEED_MAX);
+}
+
+static void maybe_decide(tank_t *t, int i)
+{
+    fish_t *f = &t->fish[i];
+    dist_t now[SEE_COUNT];
+    look(t, i, now);
+    bool changed = memcmp(now, f->seen, sizeof(now)) != 0;
+    memcpy(f->seen, now, sizeof(now));
+
+    /* The regular schedule runs on regardless, so fish that all react to the
+     * same event do not end up deciding in step for ever after. */
+    f->decide_ticks--;
+    bool due = f->decide_ticks <= 0;
+    if (due) {
+        f->decide_ticks = DECIDE_TICKS;
+    }
+    if (!due && !f->startled && !changed) {
+        return;
+    }
+
+    percept_t p;
+    tank_percept(t, i, &p);
+    goal_t goal = t->choose(&p);
+    if ((int)goal >= 0 && (int)goal < GOAL_COUNT) {
+        f->goal = goal; /* anything else is ignored: keep the current goal */
+    }
+    f->startled = false;
+}
+
+/* ---- Bodies: one per goal ---------------------------------------------- */
+
+/* Head for a point at a speed; stop once within `arrive` of it. Returns true
+ * once it has arrived. */
+static bool steer_to(const fish_t *f, float tx, float ty, float speed, float arrive, steer_t *s)
+{
+    float dx = tx - f->x, dy = ty - f->y;
+    float d = sqrtf(dx * dx + dy * dy);
+    if (d <= arrive || d < 0.001f) {
+        s->vx = 0.0f;
+        s->vy = 0.0f;
+        return true;
+    }
+    s->vx = dx / d * speed;
+    s->vy = dy / d * speed;
+    return false;
+}
+
+static void body_wander(tank_t *t, fish_t *f, steer_t *s)
+{
+    if (distance(f->x, f->y, f->tx, f->ty) < WANDER_ARRIVE_PX || f->target_ticks <= 0) {
         pick_wander_target(t, f);
-        dx = f->tx - f->x;
-        dy = f->ty - f->y;
-        dist = sqrtf(dx * dx + dy * dy);
     } else {
         f->target_ticks--;
     }
-
-    float want_vx = 0.0f, want_vy = 0.0f;
-    if (dist > 0.001f) {
-        want_vx = dx / dist * WANDER_SPEED;
-        want_vy = dy / dist * WANDER_SPEED;
-    }
-    f->vx += (want_vx - f->vx) * STEER_GAIN;
-    f->vy += (want_vy - f->vy) * STEER_GAIN;
+    steer_to(f, f->tx, f->ty, WANDER_SPEED, 0.0f, s);
 }
 
-static void move(fish_t *f)
+/* Each of the bodies below returns false if its goal has no target right
+ * now, in which case the fish wanders for this tick. */
+
+static bool body_seek_food(tank_t *t, fish_t *f, steer_t *s)
 {
+    float d = 0.0f;
+    int i = nearest_pellet(t, f->x, f->y, &d);
+    if (i < 0) {
+        return false;
+    }
+    steer_to(f, t->pellets[i].x, t->pellets[i].y, SEEK_SPEED, 0.0f, s);
+    return true;
+}
+
+static bool body_rest(tank_t *t, fish_t *f, steer_t *s)
+{
+    (void)t;
+    steer_to(f, f->x, REST_Y, REST_SPEED, REST_ARRIVE_PX, s);
+    return true;
+}
+
+static void steer(tank_t *t, int i, steer_t *s)
+{
+    fish_t *f = &t->fish[i];
+    bool done = false;
+    s->gain = STEER_GAIN;
+    switch (f->goal) {
+    case GOAL_SEEK_FOOD:
+        done = body_seek_food(t, f, s);
+        break;
+    case GOAL_REST:
+        done = body_rest(t, f, s);
+        break;
+    default:
+        break;
+    }
+    if (!done) {
+        s->gain = STEER_GAIN;
+        body_wander(t, f, s);
+    }
+}
+
+static void move(fish_t *f, const steer_t *s)
+{
+    f->vx += (s->vx - f->vx) * s->gain;
+    f->vy += (s->vy - f->vy) * s->gain;
     f->x += f->vx * TICK_S;
     f->y += f->vy * TICK_S;
 
@@ -140,12 +489,35 @@ static void move(fish_t *f)
     }
 }
 
+static void maybe_eat(tank_t *t, fish_t *f)
+{
+    if (f->goal != GOAL_SEEK_FOOD) {
+        return;
+    }
+    float d = 0.0f;
+    int i = nearest_pellet(t, f->x, f->y, &d);
+    if (i >= 0 && d < EAT_RADIUS_PX) {
+        t->pellets[i].alive = false;
+        f->hunger = clampf(f->hunger - HUNGER_PER_PELLET, 0.0f, NEED_MAX);
+    }
+}
+
+/* ---- One tick ---------------------------------------------------------- */
+
 void tank_tick(tank_t *t, int minutes)
 {
-    (void)minutes; /* day and night arrive in Part 2 */
     t->tick++;
+    t->night = is_night(minutes);
+    update_finger(t);
+    update_pellets(t);
+
     for (int i = 0; i < TANK_FISH; i++) {
-        wander(t, &t->fish[i]);
-        move(&t->fish[i]);
+        fish_t *f = &t->fish[i];
+        steer_t s;
+        update_needs(t, f);
+        maybe_decide(t, i);
+        steer(t, i, &s);
+        move(f, &s);
+        maybe_eat(t, f);
     }
 }

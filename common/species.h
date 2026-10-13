@@ -16,9 +16,10 @@ typedef enum { DEPTH_UPPER, DEPTH_MIDDLE, DEPTH_BOTTOM } depth_t;
 
 typedef struct {
     const char *name;
-    int bold;      /* 0..9 */
-    int social;    /* 0..9 */
-    depth_t depth; /* where it likes to swim */
+    int bold;           /* 0..9 */
+    int social;         /* 0..9 */
+    depth_t depth;      /* where it likes to swim */
+    int hunger_minutes; /* appetite: minutes from full to starving */
 } species_info_t;
 
 /* NULL if s is not a species. */

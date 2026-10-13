@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stdlib.h>
 
 #include "app.h"
@@ -7,6 +8,9 @@
 
 extern uint32_t stub_millis;
 extern int stub_pushes;
+extern int stub_minutes;
+extern bool stub_touch_down;
+extern int stub_touch_x, stub_touch_y;
 
 static uint16_t *fb;
 
@@ -82,6 +86,48 @@ static void test_restart(void)
     CHECK(app_tank()->tick == 0);
 }
 
+static void test_touch_reaches_the_tank(void)
+{
+    stub_millis = 0;
+    app_init(1);
+    app_set_speed(1);
+    stub_touch_down = true;
+    stub_touch_x = 100;
+    stub_touch_y = 100;
+    ticks_after(50);
+    CHECK(app_tank()->touching);
+    stub_touch_down = false;
+    ticks_after(50);
+    CHECK(!app_tank()->touching);
+    int pellets = 0;
+    for (int i = 0; i < TANK_PELLETS; i++) {
+        pellets += app_tank()->pellets[i].alive;
+    }
+    CHECK(pellets == 1); /* that was a tap */
+}
+
+static void test_time_override(void)
+{
+    stub_millis = 0;
+    stub_minutes = 12 * 60;
+    app_init(1);
+    app_set_speed(1);
+    app_set_time(APP_TIME_REAL);
+    ticks_after(50);
+    CHECK(!app_tank()->night);
+    app_set_time(APP_TIME_NIGHT);
+    ticks_after(50);
+    CHECK(app_tank()->night);
+    stub_minutes = 0; /* really midnight, but day is forced */
+    app_set_time(APP_TIME_DAY);
+    ticks_after(50);
+    CHECK(!app_tank()->night);
+    app_set_time(APP_TIME_REAL);
+    ticks_after(50);
+    CHECK(app_tank()->night);
+    stub_minutes = 12 * 60;
+}
+
 void test_app(void)
 {
     fb = malloc(DISPLAY_W * DISPLAY_H * sizeof(uint16_t));
@@ -91,5 +137,7 @@ void test_app(void)
     test_clock_wraparound();
     test_speed();
     test_restart();
+    test_touch_reaches_the_tank();
+    test_time_override();
     free(fb);
 }

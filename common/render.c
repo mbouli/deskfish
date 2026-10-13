@@ -33,13 +33,21 @@ void render_foreground(uint16_t *fb)
     gfx_blit_keyed(fb, &asset_front, 0, art_top(), 1, false);
 }
 
+#define PELLET_COLOUR RGB565(214, 170, 96)
+
 void render_tank(const tank_t *t, int minutes, uint16_t *fb)
 {
-    (void)minutes; /* night dimming arrives in Part 2 */
+    (void)minutes; /* night dimming arrives in Task 3 */
     render_background(fb);
     for (int i = 0; i < TANK_FISH; i++) {
         const fish_t *f = &t->fish[i];
         render_fish(fb, f->species, (int)(f->x + 0.5f), (int)(f->y + 0.5f), f->facing_left);
     }
     render_foreground(fb);
+    for (int i = 0; i < TANK_PELLETS; i++) {
+        const pellet_t *p = &t->pellets[i];
+        if (p->alive) {
+            gfx_fill_rect(fb, (int)(p->x + 0.5f) - 1, (int)(p->y + 0.5f) - 1, 3, 3, PELLET_COLOUR);
+        }
+    }
 }
