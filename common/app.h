@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "light.h"
@@ -24,6 +25,19 @@ void app_set_speed(int multiplier);
 void app_set_sky_rate(int multiplier);
 void app_skip_sky(int64_t seconds);
 int64_t app_sky_time(void);
+
+/* Give the app a model file's bytes. From then on, and across app_init, fish
+ * ask the model. False, and nothing changes, if the file is not usable. The
+ * bytes are not kept. */
+bool app_set_model(const uint8_t *data, size_t size);
+
+/* Go back to the hand-written rules (true), or to the model if one is loaded (false). */
+void app_use_rules(bool rules);
+bool app_using_model(void);
+
+/* Decisions the model has made, the milliseconds they took in total, and the
+ * longest one. Any pointer may be NULL. */
+void app_model_stats(unsigned *count, uint32_t *total_ms, uint32_t *longest_ms);
 
 /* For inspection. */
 const tank_t *app_tank(void);

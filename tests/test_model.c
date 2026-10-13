@@ -2,30 +2,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "file_helpers.h"
 #include "model.h"
 #include "percept_text.h"
+#include "tank_helpers.h"
 #include "test.h"
-
-#define MODEL_PATH "../model/out/deskfish_model.bin"
-
-static uint8_t *read_file(const char *path, size_t *size)
-{
-    FILE *f = fopen(path, "rb");
-    if (f == NULL) {
-        return NULL;
-    }
-    fseek(f, 0, SEEK_END);
-    long length = ftell(f);
-    fseek(f, 0, SEEK_SET);
-    uint8_t *data = malloc((size_t)length + 1);
-    if (data != NULL && fread(data, 1, (size_t)length, f) != (size_t)length) {
-        free(data);
-        data = NULL;
-    }
-    fclose(f);
-    *size = (size_t)length;
-    return data;
-}
 
 static void put_u32(uint8_t *at, uint32_t v)
 {
@@ -208,6 +189,36 @@ static void test_choose_is_safe(model_t *m)
     CHECK(!model_choose(NULL, &p, &untouched));
 }
 
+static model_t *shared;
+static choice_t ask_shared(const percept_t *p)
+{
+    choice_t c = {GOAL_COUNT, MOOD_COUNT};
+    model_choose(shared, p, &c);
+    return c;
+}
+
+static void test_same_seed_same_tank(model_t *m)
+{
+    tank_t a, b;
+    script_t sa = {7, false, 0, 0}, sb = {7, false, 0, 0};
+    shared = m;
+    tank_init(&a, 21);
+    tank_init(&b, 21);
+    tank_set_brain(&a, ask_shared);
+    tank_set_brain(&b, ask_shared);
+    bool some_mood = false;
+    for (int i = 0; i < 1500; i++) {
+        script_step(&sa, &a);
+        script_step(&sb, &b);
+        tank_tick(&a, DAY);
+        tank_tick(&b, DAY);
+        some_mood = some_mood || a.fish[0].mood != MOOD_CALM || a.fish[2].mood != MOOD_CALM;
+    }
+    CHECK(memcmp(&a, &b, sizeof(a)) == 0);
+    CHECK(all_ok(&a));
+    CHECK(some_mood); /* the model's moods did reach the fish */
+}
+
 void test_model(void)
 {
     size_t size = 0;
@@ -222,6 +233,7 @@ void test_model(void)
     if (m != NULL) {
         test_agrees_with_python(m);
         test_choose_is_safe(m);
+        test_same_seed_same_tank(m);
     }
     model_free(m);
     free(data);

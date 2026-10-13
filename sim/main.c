@@ -9,6 +9,7 @@
 #include "clock.h"
 #include "display.h"
 #include "light.h"
+#include "model.h"
 #include "percept_text.h"
 #include "render.h"
 #include "scene.h"
@@ -46,12 +47,48 @@ static int write_snapshot(const char *path, const uint16_t *fb)
     return 0;
 }
 
+#define DEFAULT_MODEL "model/out/deskfish_model.bin"
+
+/* A whole file in memory, for the caller to free. NULL if it cannot be read. */
+static uint8_t *read_file(const char *path, size_t *size)
+{
+    FILE *f = fopen(path, "rb");
+    if (f == NULL) {
+        return NULL;
+    }
+    uint8_t *data = NULL;
+    long length = -1;
+    if (fseek(f, 0, SEEK_END) == 0 && (length = ftell(f)) >= 0 && fseek(f, 0, SEEK_SET) == 0) {
+        data = malloc((size_t)length + 1);
+        if (data != NULL && fread(data, 1, (size_t)length, f) != (size_t)length) {
+            free(data);
+            data = NULL;
+        }
+    }
+    fclose(f);
+    *size = data != NULL ? (size_t)length : 0;
+    return data;
+}
+
+/* The model for a headless run, which has a tank of its own rather than the app's. */
+static model_t *headless_model;
+
+static choice_t headless_brain(const percept_t *p)
+{
+    choice_t c = {GOAL_COUNT, MOOD_COUNT};
+    model_choose(headless_model, p, &c);
+    return c;
+}
+
 static void usage(void)
 {
     fprintf(stderr,
-            "usage: deskfish_sim [--seed S]\n"
+            "usage: deskfish_sim [--seed S] [--model FILE | --rules]\n"
             "       deskfish_sim --headless [--seed S] [--ticks N] [--at YYYY-MM-DDTHH:MM] [--snapshot FILE.ppm]\n"
+            "                    [--model FILE | --rules]\n"
             "       --at is in UTC; without it, the time is now\n"
+            "       fish listen to the model in " DEFAULT_MODEL " unless told otherwise;\n"
+            "       --rules has them follow the hand-written rules\n"
             "       deskfish_sim --headless --traces FILE [--runs N] [--ticks N] [--seed S]\n"
             "keys:  F fast fish   R restart   T sky time-lapse   N sky +3 hours   D print\n");
 }
@@ -90,7 +127,8 @@ static void print_fish(const tank_t *tank)
 }
 
 /* Run with no window and print where everything ended up. */
-static int run_headless(uint32_t seed, long ticks, int64_t unix_utc, const char *snapshot, uint16_t *fb)
+static int run_headless(uint32_t seed, long ticks, int64_t unix_utc, const char *snapshot, uint16_t *fb,
+                        const uint8_t *model_data, size_t model_size)
 {
     const place_t place = {PLACE_LAT_DEG, PLACE_LON_DEG};
     sky_t sky;
@@ -100,6 +138,10 @@ static int run_headless(uint32_t seed, long ticks, int64_t unix_utc, const char 
 
     tank_t tank;
     tank_init(&tank, seed);
+    headless_model = model_data != NULL ? model_load(model_data, model_size) : NULL;
+    if (headless_model != NULL) {
+        tank_set_brain(&tank, headless_brain);
+    }
     for (long i = 0; i < ticks; i++) {
         tank_tick(&tank, light.fish_night);
     }
@@ -234,6 +276,8 @@ int main(int argc, char **argv)
     long runs = 20;
     bool runs_given = false;
     const char *traces = NULL;
+    const char *model_path = DEFAULT_MODEL;
+    bool rules = false, model_given = false;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--headless") == 0) {
@@ -252,6 +296,11 @@ int main(int argc, char **argv)
             snapshot = argv[++i];
         } else if (strcmp(argv[i], "--traces") == 0 && i + 1 < argc) {
             traces = argv[++i];
+        } else if (strcmp(argv[i], "--model") == 0 && i + 1 < argc) {
+            model_path = argv[++i];
+            model_given = true;
+        } else if (strcmp(argv[i], "--rules") == 0) {
+            rules = true;
         } else if (strcmp(argv[i], "--runs") == 0 && i + 1 < argc) {
             runs = strtol(argv[++i], NULL, 10);
             runs_given = true;
@@ -260,7 +309,7 @@ int main(int argc, char **argv)
             return 2;
         }
     }
-    if (ticks < 0 || runs < 1 ||
+    if (ticks < 0 || runs < 1 || (rules && model_given) || (traces != NULL && (rules || model_given)) ||
         (!headless && (ticks != 0 || snapshot != NULL || at_given || traces != NULL || runs_given))) {
         usage();
         return 2;
@@ -277,8 +326,28 @@ int main(int argc, char **argv)
         free(fb);
         return result;
     }
+    /* Fish listen to the model unless told to follow the rules. Traces are
+     * always the rules' answers, so they never get here. */
+    uint8_t *model_data = NULL;
+    size_t model_size = 0;
+    if (!rules) {
+        model_data = read_file(model_path, &model_size);
+        model_t *check = model_data != NULL ? model_load(model_data, model_size) : NULL;
+        if (check != NULL) {
+            printf("model: %s (%u numbers)\n", model_path, (unsigned)model_numbers(check));
+            model_free(check);
+        } else {
+            printf("model: cannot use %s; fish are following the rules\n", model_path);
+            free(model_data);
+            model_data = NULL;
+        }
+    } else {
+        printf("model: not used; fish are following the rules\n");
+    }
+
     if (headless) {
-        int result = run_headless(seed, ticks, at, snapshot, fb);
+        int result = run_headless(seed, ticks, at, snapshot, fb, model_data, model_size);
+        free(model_data);
         free(fb);
         return result;
     }
@@ -288,6 +357,10 @@ int main(int argc, char **argv)
 
     display_init();
     touch_init();
+    if (model_data != NULL) {
+        app_set_model(model_data, model_size);
+        free(model_data);
+    }
     if (!app_init(seed)) {
         fprintf(stderr, "out of memory\n");
         return 1;
@@ -329,6 +402,12 @@ int main(int argc, char **argv)
             printf("tick %u\n", (unsigned)app_tank()->tick);
             print_sky(app_sky_time(), app_sky(), app_light());
             print_fish(app_tank());
+            unsigned asked = 0;
+            uint32_t total_ms = 0;
+            app_model_stats(&asked, &total_ms, NULL);
+            if (app_using_model() && asked > 0) {
+                printf("  the model has decided %u times, %.2f ms each on average\n", asked, (double)total_ms / asked);
+            }
         }
 
         uint32_t spent = clock_millis() - start;

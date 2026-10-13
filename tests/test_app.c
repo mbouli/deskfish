@@ -4,6 +4,7 @@
 
 #include "app.h"
 #include "display.h"
+#include "file_helpers.h"
 #include "sky.h"
 #include "tank.h"
 #include "test.h"
@@ -201,6 +202,44 @@ static void test_sky_jump(void)
     CHECK(app_sky_time() == stub_unix);
 }
 
+static void test_app_model(void)
+{
+    size_t size = 0;
+    uint8_t *data = read_file(MODEL_PATH, &size);
+    CHECK(data != NULL);
+    CHECK(!app_using_model());
+    CHECK(!app_set_model(data, 10)); /* cut short: refused, rules stay */
+    CHECK(!app_using_model());
+    CHECK(app_set_model(data, size));
+    free(data);                      /* the app must not need the bytes any more */
+    CHECK(app_using_model());
+    CHECK(app_init(9));
+    CHECK(app_using_model());        /* survives a restart */
+
+    unsigned before = 0, after = 0;
+    app_model_stats(&before, NULL, NULL);
+    for (int i = 0; i < 200; i++) {
+        stub_millis += 50;
+        app_frame(fb);
+    }
+    app_model_stats(&after, NULL, NULL);
+    CHECK(after > before);           /* the model was asked */
+
+    app_use_rules(true);
+    CHECK(!app_using_model());
+    unsigned frozen = 0, later = 0;
+    app_model_stats(&frozen, NULL, NULL);
+    for (int i = 0; i < 100; i++) {
+        stub_millis += 50;
+        app_frame(fb);
+    }
+    app_model_stats(&later, NULL, NULL);
+    CHECK(later == frozen);          /* the rules were asked instead */
+    app_use_rules(false);
+    CHECK(app_using_model());
+    app_use_rules(true);             /* leave the app as other tests expect */
+}
+
 void test_app(void)
 {
     fb = malloc(DISPLAY_W * DISPLAY_H * sizeof(uint16_t));
@@ -215,5 +254,6 @@ void test_app(void)
     test_relight_only_on_a_new_minute();
     test_time_lapse();
     test_sky_jump();
+    test_app_model();
     free(fb);
 }

@@ -2,6 +2,7 @@
 
 #include "clock.h"
 #include "display.h"
+#include "model.h"
 #include "render.h"
 #include "scene.h"
 #include "touch.h"
@@ -24,6 +25,32 @@ static sky_t sky;
 static light_t light;
 static unsigned relights;
 
+/* The model, once one has been loaded, and what asking it has cost. */
+static model_t *model;
+static bool use_rules;
+static unsigned model_count;
+static uint32_t model_total_ms, model_longest_ms;
+
+/* The model, in the shape the tank expects of a brain. */
+static choice_t model_brain(const percept_t *p)
+{
+    choice_t c = {GOAL_COUNT, MOOD_COUNT}; /* unusable unless the model answers: the tank then changes nothing */
+    uint32_t before = clock_millis();
+    model_choose(model, p, &c);
+    uint32_t took = clock_millis() - before;
+    model_count++;
+    model_total_ms += took;
+    if (took > model_longest_ms) {
+        model_longest_ms = took;
+    }
+    return c;
+}
+
+static void pick_brain(void)
+{
+    tank_set_brain(&tank, model != NULL && !use_rules ? model_brain : NULL);
+}
+
 static void relight(void)
 {
     const place_t place = {PLACE_LAT_DEG, PLACE_LON_DEG};
@@ -36,6 +63,7 @@ static void relight(void)
 bool app_init(uint32_t seed)
 {
     tank_init(&tank, seed);
+    pick_brain();
     last_ms = clock_millis();
     owed_ms = 0;
     lit = false; /* light it on the first frame */
@@ -124,4 +152,40 @@ void app_frame(uint16_t *fb)
 
     render_tank(&tank, fb);
     display_push(fb, 0, 0, DISPLAY_W, DISPLAY_H);
+}
+
+bool app_set_model(const uint8_t *data, size_t size)
+{
+    model_t *loaded = model_load(data, size);
+    if (loaded == NULL) {
+        return false;
+    }
+    model_free(model);
+    model = loaded;
+    pick_brain();
+    return true;
+}
+
+void app_use_rules(bool rules)
+{
+    use_rules = rules;
+    pick_brain();
+}
+
+bool app_using_model(void)
+{
+    return model != NULL && !use_rules;
+}
+
+void app_model_stats(unsigned *count, uint32_t *total_ms, uint32_t *longest_ms)
+{
+    if (count != NULL) {
+        *count = model_count;
+    }
+    if (total_ms != NULL) {
+        *total_ms = model_total_ms;
+    }
+    if (longest_ms != NULL) {
+        *longest_ms = model_longest_ms;
+    }
 }
