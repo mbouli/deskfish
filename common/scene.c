@@ -27,7 +27,7 @@
 /* The distant ruins are the sky behind them times this, per channel. At midday
  * it turns the art's water colour into the art's own silhouette colour. */
 static const float RUIN_SHADE[3] = {0.84f, 0.90f, 0.97f};
-static const float HALO_RADIUS[LIGHT_HALOS] = {26.0f, 64.0f, 120.0f};
+static const int HALO_RADIUS[LIGHT_HALOS] = {26, 64, 120};
 
 static uint16_t *backdrop_px;
 static uint16_t *front_px;
@@ -108,18 +108,64 @@ static uint16_t tint(uint16_t colour, const float t[3])
     return out == GFX_KEY ? (uint16_t)(GFX_KEY - 1) : out;
 }
 
-static int row_wobble(int y, int i)
+/* ---- The sky's bands ----------------------------------------------------
+ *
+ * The rule: a pixel is in the first band i for which
+ *     dx*dx + dy2 < T*T,   T = band_radius[i] - wobble[row][i]
+ * where dy2 is the squared vertical distance from the bands' centre, stretched
+ * by SQUASH and rounded to a whole number. Everything is whole numbers, so the
+ * rule can be turned round: on one row, band i is simply every pixel within
+ *     sqrt(T*T - dy2)
+ * of the centre's column. That is one square root per band per row, in place
+ * of one per pixel. */
+
+static long squashed_dy2(int y, int centre_y)
 {
-    return y >= 0 && y < DISPLAY_H ? wobble[y][i] : 0;
+    float dy = (float)(y - centre_y) * SQUASH;
+    return lroundf(dy * dy);
+}
+
+/* The largest w for which w*w < limit, or -1 if there is none. */
+static int half_width(long limit)
+{
+    if (limit <= 0) {
+        return -1;
+    }
+    long w = (long)sqrtf((float)limit);
+    while (w > 0 && w * w >= limit) {
+        w--;
+    }
+    while ((w + 1) * (w + 1) < limit) {
+        w++;
+    }
+    return (int)w;
+}
+
+/* How far band i reaches either side of the centre's column on row y; -1 if
+ * it does not touch this row. */
+static int band_reach(int radius, int y, int i, long dy2)
+{
+    long t = radius - wobble[y][i];
+    return t > 0 ? half_width(t * t - dy2) : -1;
+}
+
+static void fill_span(uint16_t *row, int centre, int reach, uint16_t colour)
+{
+    int x0 = centre - reach < 0 ? 0 : centre - reach;
+    int x1 = centre + reach >= DISPLAY_W ? DISPLAY_W - 1 : centre + reach;
+    for (int x = x0; x <= x1; x++) {
+        row[x] = colour;
+    }
 }
 
 /* Which band of sky a pixel is in: 0 nearest the sun, LIGHT_BANDS - 1 the rest. */
 static int band_at(const light_t *light, int x, int y)
 {
-    float dx = (float)(x - light->centre_x), dy = (float)(y - light->centre_y) * SQUASH;
-    float r = sqrtf(dx * dx + dy * dy);
+    long dx = x - light->centre_x;
+    long dy2 = squashed_dy2(y, light->centre_y);
     for (int i = 0; i < LIGHT_BANDS - 1; i++) {
-        if (r + (float)row_wobble(y, i) < (float)light->band_radius[i]) {
+        long t = light->band_radius[i] - wobble[y][i];
+        if (t > 0 && dx * dx + dy2 < t * t) {
             return i;
         }
     }
@@ -136,21 +182,42 @@ static void put(int x, int y, uint16_t colour)
 static void draw_sky(const light_t *light)
 {
     for (int y = 0; y < DISPLAY_H; y++) {
+        uint16_t *row = &backdrop_px[y * DISPLAY_W];
         for (int x = 0; x < DISPLAY_W; x++) {
-            int band = band_at(light, x, y);
-            uint16_t colour = light->band_colour[band];
-            if (light->show_halo && band == LIGHT_BANDS - 1) {
-                /* The moon's rings only ever replace the outermost sky colour. */
-                float dx = (float)(x - light->moon_x), dy = (float)(y - light->moon_y) * SQUASH;
-                float r = sqrtf(dx * dx + dy * dy);
-                for (int k = 0; k < LIGHT_HALOS; k++) {
-                    if (r + (float)row_wobble(y, k) < HALO_RADIUS[k]) {
-                        colour = light->halo_colour[k];
-                        break;
-                    }
+            row[x] = light->band_colour[LIGHT_BANDS - 1];
+        }
+
+        /* Paint the bands from the outside in, so the innermost one that
+         * reaches a pixel is the one that shows. */
+        long dy2 = squashed_dy2(y, light->centre_y);
+        int widest = -1; /* beyond this, the row is still the outermost band */
+        for (int i = LIGHT_BANDS - 2; i >= 0; i--) {
+            int reach = band_reach(light->band_radius[i], y, i, dy2);
+            if (reach >= 0) {
+                fill_span(row, light->centre_x, reach, light->band_colour[i]);
+                widest = reach > widest ? reach : widest;
+            }
+        }
+
+        if (!light->show_halo) {
+            continue;
+        }
+        /* The moon's rings follow the same rule around the moon, but only ever
+         * replace the outermost sky colour. */
+        long moon_dy2 = squashed_dy2(y, light->moon_y);
+        for (int k = LIGHT_HALOS - 1; k >= 0; k--) {
+            int reach = band_reach(HALO_RADIUS[k], y, k, moon_dy2);
+            if (reach < 0) {
+                continue;
+            }
+            int x0 = light->moon_x - reach < 0 ? 0 : light->moon_x - reach;
+            int x1 = light->moon_x + reach >= DISPLAY_W ? DISPLAY_W - 1 : light->moon_x + reach;
+            for (int x = x0; x <= x1; x++) {
+                long from_centre = x - light->centre_x;
+                if (from_centre > widest || from_centre < -widest) {
+                    row[x] = light->halo_colour[k];
                 }
             }
-            backdrop_px[y * DISPLAY_W + x] = colour;
         }
     }
 }
@@ -211,16 +278,34 @@ static void draw_moon(const light_t *light)
     }
 }
 
+/* The art has few colours, in long runs. Remembering the last colour tinted
+ * means most pixels cost one comparison, not three multiplications. */
+typedef struct {
+    bool primed;
+    uint16_t in, out;
+} tint_memo_t;
+
+static uint16_t tint_run(tint_memo_t *memo, uint16_t colour, const float t[3])
+{
+    if (!memo->primed || memo->in != colour) {
+        memo->primed = true;
+        memo->in = colour;
+        memo->out = tint(colour, t);
+    }
+    return memo->out;
+}
+
 static void draw_ruins_and_sand(const light_t *light)
 {
+    tint_memo_t sand_memo = {false, 0, 0}, ruin_memo = {false, 0, 0};
     for (int y = 0; y < FRONT_H; y++) {
         uint16_t *row = &backdrop_px[(y + ART_TOP) * DISPLAY_W];
         const uint16_t *sand = &asset_sand.px[y * DISPLAY_W];
         for (int x = 0; x < DISPLAY_W; x++) {
             if (sand[x] != GFX_KEY) {
-                row[x] = tint(sand[x], light->tint);
+                row[x] = tint_run(&sand_memo, sand[x], light->tint);
             } else if ((asset_far_mask[y][x >> 3] >> (x & 7)) & 1) {
-                row[x] = tint(row[x], RUIN_SHADE); /* the sky behind, a little darker */
+                row[x] = tint_run(&ruin_memo, row[x], RUIN_SHADE); /* the sky behind, a little darker */
             }
         }
     }
@@ -228,9 +313,42 @@ static void draw_ruins_and_sand(const light_t *light)
 
 static void tint_keyed(uint16_t *dst, const uint16_t *src, int count, const float t[3])
 {
+    tint_memo_t memo = {false, 0, 0};
     for (int i = 0; i < count; i++) {
-        dst[i] = src[i] == GFX_KEY ? GFX_KEY : tint(src[i], t);
+        dst[i] = src[i] == GFX_KEY ? GFX_KEY : tint_run(&memo, src[i], t);
     }
+}
+
+/* What was last drawn, so unchanged work can be skipped. */
+static light_t drawn;
+static bool have_drawn;
+
+static bool same_tint(const light_t *a, const light_t *b)
+{
+    return a->tint[0] == b->tint[0] && a->tint[1] == b->tint[1] && a->tint[2] == b->tint[2];
+}
+
+/* Field by field: a struct may have padding, so its bytes cannot be compared. */
+static bool same_sky(const light_t *a, const light_t *b)
+{
+    for (int i = 0; i < LIGHT_BANDS - 1; i++) {
+        if (a->band_radius[i] != b->band_radius[i]) {
+            return false;
+        }
+    }
+    for (int i = 0; i < LIGHT_BANDS; i++) {
+        if (a->band_colour[i] != b->band_colour[i]) {
+            return false;
+        }
+    }
+    for (int i = 0; i < LIGHT_HALOS; i++) {
+        if (a->halo_colour[i] != b->halo_colour[i]) {
+            return false;
+        }
+    }
+    return a->centre_x == b->centre_x && a->centre_y == b->centre_y && a->show_sun == b->show_sun &&
+           a->show_moon == b->show_moon && a->moon_x == b->moon_x && a->moon_y == b->moon_y &&
+           a->moon_phase == b->moon_phase && a->show_halo == b->show_halo && a->star_count == b->star_count;
 }
 
 void scene_relight(const light_t *light)
@@ -238,23 +356,37 @@ void scene_relight(const light_t *light)
     if (backdrop_px == NULL) {
         return;
     }
-    draw_sky(light);
-    draw_stars(light);
-    if (light->show_sun) {
-        draw_disc(light->centre_x, light->centre_y, SUN_RADIUS, SUN_COLOUR);
-        draw_disc(light->centre_x, light->centre_y, SUN_CORE_RADIUS, SUN_CORE);
-    }
-    if (light->show_moon) {
-        draw_moon(light);
-    }
-    draw_ruins_and_sand(light);
-
-    tint_keyed(front_px, asset_front.px, DISPLAY_W * FRONT_H, light->tint);
-    for (int s = 0; s < SPECIES_COUNT; s++) {
-        tint_keyed(fish_px[s], asset_fish[s].px, SPRITE_PX, light->tint);
-    }
-    pellet = tint(PELLET_COLOUR, light->tint);
     relights++;
+
+    bool tint_changed = !have_drawn || !same_tint(light, &drawn);
+    bool sky_changed = !have_drawn || !same_sky(light, &drawn);
+
+    /* The backdrop holds both sky and tinted sand, so either change redraws it. */
+    if (sky_changed || tint_changed) {
+        draw_sky(light);
+        draw_stars(light);
+        if (light->show_sun) {
+            draw_disc(light->centre_x, light->centre_y, SUN_RADIUS, SUN_COLOUR);
+            draw_disc(light->centre_x, light->centre_y, SUN_CORE_RADIUS, SUN_CORE);
+        }
+        if (light->show_moon) {
+            draw_moon(light);
+        }
+        draw_ruins_and_sand(light);
+    }
+
+    /* The foreground, fish and pellet depend only on the tint, which is the
+     * same from minute to minute for most of the day. */
+    if (tint_changed) {
+        tint_keyed(front_px, asset_front.px, DISPLAY_W * FRONT_H, light->tint);
+        for (int s = 0; s < SPECIES_COUNT; s++) {
+            tint_keyed(fish_px[s], asset_fish[s].px, SPRITE_PX, light->tint);
+        }
+        pellet = tint(PELLET_COLOUR, light->tint);
+    }
+
+    drawn = *light;
+    have_drawn = true;
 }
 
 const image_t *scene_backdrop(void)

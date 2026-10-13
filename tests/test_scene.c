@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -287,6 +288,106 @@ static void test_sun_at_the_screen_edge(void)
     CHECK(scene_relight_count() > 0); /* reaching here under AddressSanitizer is the test */
 }
 
+/* The rule the sky is drawn by, written out the slow, obvious way.
+ * A pixel is in the first band i for which  dx*dx + dy2 < T*T,  where
+ * T = band_radius[i] - wobble(row, i), dy2 is the squared vertical distance
+ * (stretched by 1.35, rounded to a whole number), and wobble is the fixed
+ * per-row streak table. Whole numbers throughout, so there is no rounding to
+ * argue about. The moon's rings follow the same rule around the moon, and
+ * only ever replace the outermost band. */
+static int rule_wobble(int y, int i)
+{
+    float w = 4.0f * sinf((float)(y / 3) * 0.9f + (float)i * 1.9f) + 2.0f * sinf((float)(y / 2) * 2.3f + (float)i);
+    return 2 * (int)lroundf(w);
+}
+
+static long rule_dy2(int y, int cy)
+{
+    float dy = (float)(y - cy) * 1.35f;
+    return lroundf(dy * dy);
+}
+
+static uint16_t rule_colour(const light_t *l, int x, int y)
+{
+    static const int halo_radius[LIGHT_HALOS] = {26, 64, 120};
+    long dx = x - l->centre_x, r2 = dx * dx + rule_dy2(y, l->centre_y);
+    for (int i = 0; i < LIGHT_BANDS - 1; i++) {
+        long t = l->band_radius[i] - rule_wobble(y, i);
+        if (t > 0 && r2 < t * t) {
+            return l->band_colour[i];
+        }
+    }
+    if (l->show_halo) {
+        long mx = x - l->moon_x, m2 = mx * mx + rule_dy2(y, l->moon_y);
+        for (int k = 0; k < LIGHT_HALOS; k++) {
+            long t = halo_radius[k] - rule_wobble(y, k);
+            if (t > 0 && m2 < t * t) {
+                return l->halo_colour[k];
+            }
+        }
+    }
+    return l->band_colour[LIGHT_BANDS - 1];
+}
+
+static void test_sky_follows_the_rule_exactly(void)
+{
+    /* Bare sky only: no sun, moon or stars drawn over it. Checked above the
+     * art, where nothing else is drawn either. */
+    static const struct { float alt; bool up; float progress; } cases[] = {
+        {60.0f, true, 0.5f}, {20.0f, true, 0.2f}, {1.0f, true, 0.0f}, {1.0f, true, 1.0f}, {6.0f, true, 0.93f},
+        {-2.0f, false, 0.01f}, {-7.0f, false, 0.05f}, {-9.0f, false, 0.97f}, {-40.0f, false, 0.5f},
+        {-40.0f, false, 0.02f}, {-40.0f, false, 0.98f},
+    };
+    int wrong = 0;
+    for (unsigned c = 0; c < sizeof(cases) / sizeof(cases[0]); c++) {
+        light_t l = light_at(cases[c].alt, cases[c].up, cases[c].progress, 0.5f);
+        l.show_sun = false;
+        l.show_moon = false; /* the halo stays on: it is part of the sky */
+        l.star_count = 0;
+        scene_relight(&l);
+        for (int y = 0; y < ART_TOP; y++) {
+            for (int x = 0; x < DISPLAY_W; x++) {
+                wrong += back(x, y) != rule_colour(&l, x, y);
+            }
+        }
+    }
+    CHECK(wrong == 0);
+}
+
+static void test_changing_light_always_takes_effect(void)
+{
+    /* Skipping work that has not changed must never leave a stale picture. */
+    light_t noon = light_at(60.0f, true, 0.5f, 0.5f), night = light_at(-40.0f, false, 0.5f, 0.5f);
+    scene_relight(&noon);
+    scene_relight(&noon); /* the same light twice */
+    CHECK(memcmp(scene_front()->px, asset_front.px, DISPLAY_W * 192 * sizeof(uint16_t)) == 0);
+    scene_relight(&night);
+    CHECK(memcmp(scene_front()->px, asset_front.px, DISPLAY_W * 192 * sizeof(uint16_t)) != 0);
+    CHECK(scene_pellet() != RGB565(214, 170, 96));
+    CHECK(back(4, 4) == RGB565(14, 18, 52));
+    scene_relight(&noon);
+    CHECK(memcmp(scene_front()->px, asset_front.px, DISPLAY_W * 192 * sizeof(uint16_t)) == 0);
+    CHECK(memcmp(scene_fish(SPECIES_GOLDFISH)->px, asset_fish[SPECIES_GOLDFISH].px, 256 * sizeof(uint16_t)) == 0);
+    CHECK(scene_pellet() == RGB565(214, 170, 96));
+    CHECK(back(4, 4) == asset_water);
+
+    /* Same sky, different tint: the sand and foreground must still change. */
+    light_t dim = noon;
+    dim.tint[0] = dim.tint[1] = dim.tint[2] = 0.5f;
+    scene_relight(&dim);
+    CHECK(back(4, 4) == asset_water);
+    CHECK(memcmp(scene_front()->px, asset_front.px, DISPLAY_W * 192 * sizeof(uint16_t)) != 0);
+    CHECK(back(160, DISPLAY_H - 2) != asset_sand.px[(192 - 2) * DISPLAY_W + 160]);
+    /* Same tint, different sky: the sky must change and the sand must not. */
+    light_t moved = dim;
+    moved.centre_x += 40;
+    uint16_t sand_before = back(160, DISPLAY_H - 2);
+    scene_relight(&moved);
+    CHECK(back(160, DISPLAY_H - 2) == sand_before);
+    CHECK(back(moved.centre_x, moved.centre_y) == SUN_CORE);
+    scene_relight(&noon);
+}
+
 void test_scene(void)
 {
     test_shapes();
@@ -298,4 +399,6 @@ void test_scene(void)
     test_relight_is_repeatable();
     test_tint_never_makes_a_hole();
     test_sun_at_the_screen_edge();
+    test_sky_follows_the_rule_exactly();
+    test_changing_light_always_takes_effect();
 }
