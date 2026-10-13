@@ -445,6 +445,7 @@ static void test_percept(void)
     t.fish[0].stress = 8.9f;
     t.fish[0].bold = 7;
     t.fish[0].social = 2;
+    t.fish[0].species = SPECIES_BASS;
     t.fish[0].goal = GOAL_REST;
     t.fish[0].startled = true;
     t.night = true;
@@ -453,6 +454,7 @@ static void test_percept(void)
     tank_percept(&t, 0, &p);
     CHECK(p.hunger == 5 && p.energy == 0 && p.stress == 9); /* rounded */
     CHECK(p.bold == 7 && p.social == 2);
+    CHECK(p.species == SPECIES_BASS);
     CHECK(p.night && p.startled);
     CHECK(p.current == GOAL_REST);
     CHECK(p.food == DIST_MID);

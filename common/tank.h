@@ -75,6 +75,10 @@ extern const float tank_cover[TANK_COVERS][2];
 /* Set up the starting cast. The same seed always gives the same tank. */
 void tank_init(tank_t *t, uint32_t seed);
 
+/* The same, with a cast of your choosing. An entry that is not a species, or
+ * a NULL cast, uses the usual cast's fish for that place. */
+void tank_init_cast(tank_t *t, uint32_t seed, const species_t cast[TANK_FISH]);
+
 /* Use a different brain. NULL restores the built-in rules. */
 void tank_set_brain(tank_t *t, brain_fn fn);
 

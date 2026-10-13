@@ -2,6 +2,8 @@
 
 #include <stdbool.h>
 
+#include "species.h"
+
 /* What a fish can decide to do. The body in tank.c carries it out. */
 typedef enum {
     GOAL_WANDER,
@@ -19,6 +21,7 @@ typedef enum { DIST_NONE, DIST_NEAR, DIST_MID, DIST_FAR } dist_t;
 
 /* Everything the brain is allowed to know about one fish's situation. */
 typedef struct {
+    species_t species;          /* which fish this is */
     int hunger, energy, stress; /* 0..9 */
     int bold, social;           /* 0..9 */
     bool night;

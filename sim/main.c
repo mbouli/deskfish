@@ -5,9 +5,11 @@
 #include <time.h>
 
 #include "app.h"
+#include "brain.h"
 #include "clock.h"
 #include "display.h"
 #include "light.h"
+#include "percept_text.h"
 #include "render.h"
 #include "scene.h"
 #include "sim.h"
@@ -50,6 +52,7 @@ static void usage(void)
             "usage: deskfish_sim [--seed S]\n"
             "       deskfish_sim --headless [--seed S] [--ticks N] [--at YYYY-MM-DDTHH:MM] [--snapshot FILE.ppm]\n"
             "       --at is in UTC; without it, the time is now\n"
+            "       deskfish_sim --headless --traces FILE [--runs N] [--ticks N] [--seed S]\n"
             "keys:  F fast fish   R restart   T sky time-lapse   N sky +3 hours   D print\n");
 }
 
@@ -128,6 +131,99 @@ static bool parse_at(const char *text, int64_t *out)
     return true;
 }
 
+/* ---- Traces: play tanks with a fake finger and write down every situation
+ * a fish's brain is asked about, with what the rules answered. ------------ */
+
+static FILE *trace_out;
+static long trace_lines;
+
+static goal_t tracing_brain(const percept_t *p)
+{
+    goal_t goal = brain_choose(p);
+    char line[PERCEPT_TEXT_MAX];
+    if (percept_encode(p, line, sizeof(line)) > 0) {
+        fprintf(trace_out, "%s -> %s calm\n", line, goal_name(goal));
+        trace_lines++;
+    }
+    return goal;
+}
+
+static uint32_t trace_rng;
+
+static uint32_t trace_random(uint32_t below)
+{
+    trace_rng = trace_rng * 1664525u + 1013904223u;
+    return (trace_rng >> 8) % below;
+}
+
+static int run_traces(uint32_t seed, long runs, long ticks, const char *path)
+{
+    trace_out = fopen(path, "w");
+    if (trace_out == NULL) {
+        fprintf(stderr, "cannot write %s\n", path);
+        return 1;
+    }
+    trace_rng = seed != 0 ? seed : 1;
+    trace_lines = 0;
+
+    for (long run = 0; run < runs; run++) {
+        /* Five of the seven species, a different five each run. */
+        species_t pool[SPECIES_COUNT], cast[TANK_FISH];
+        for (int s = 0; s < SPECIES_COUNT; s++) {
+            pool[s] = (species_t)s;
+        }
+        for (int i = 0; i < TANK_FISH; i++) {
+            int pick = i + (int)trace_random((uint32_t)(SPECIES_COUNT - i));
+            species_t swap = pool[i];
+            pool[i] = pool[pick];
+            pool[pick] = swap;
+            cast[i] = pool[i];
+        }
+
+        tank_t tank;
+        tank_init_cast(&tank, trace_random(0x00FFFFFFu) + 1, cast);
+        tank_set_brain(&tank, tracing_brain);
+        /* Start every fish somewhere different in its needs, so the run does
+         * not spend its whole length warming up. */
+        for (int f = 0; f < TANK_FISH; f++) {
+            tank.fish[f].hunger = (float)trace_random(10);
+            tank.fish[f].energy = (float)trace_random(10);
+            tank.fish[f].stress = (float)trace_random(10);
+        }
+
+        bool down = false;
+        int held = 0, x = 0, y = 0;
+        for (long tick = 0; tick < ticks; tick++) {
+            if (down && --held <= 0) {
+                down = false;
+            } else if (!down && trace_random(60) == 0) {
+                down = true;
+                held = trace_random(10) < 6 ? 2 : 20 + (int)trace_random(140); /* a tap, or a hold */
+                if (trace_random(2) == 0) { /* aimed at a fish, give or take */
+                    const fish_t *target = &tank.fish[trace_random(TANK_FISH)];
+                    x = (int)target->x - 30 + (int)trace_random(61);
+                    y = (int)target->y - 30 + (int)trace_random(61);
+                } else {
+                    x = (int)trace_random(DISPLAY_W);
+                    y = (int)trace_random(DISPLAY_H);
+                }
+            } else if (down && trace_random(3) == 0) {
+                x += (int)trace_random(7) - 3; /* a held finger wanders a little */
+                y += (int)trace_random(7) - 3;
+            }
+            x = x < 0 ? 0 : x >= DISPLAY_W ? DISPLAY_W - 1 : x;
+            y = y < 0 ? 0 : y >= DISPLAY_H ? DISPLAY_H - 1 : y;
+            tank_set_finger(&tank, down, x, y);
+
+            bool night = ((tick / 1500) + run) % 3 == 0; /* a third of the time */
+            tank_tick(&tank, night);
+        }
+    }
+    fclose(trace_out);
+    printf("wrote %ld lines from %ld runs of %ld ticks to %s\n", trace_lines, runs, ticks, path);
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     uint32_t seed = (uint32_t)time(NULL);
@@ -135,6 +231,9 @@ int main(int argc, char **argv)
     int64_t at = (int64_t)time(NULL);
     bool headless = false, at_given = false;
     const char *snapshot = NULL;
+    long runs = 20;
+    bool runs_given = false;
+    const char *traces = NULL;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--headless") == 0) {
@@ -151,12 +250,18 @@ int main(int argc, char **argv)
             at_given = true;
         } else if (strcmp(argv[i], "--snapshot") == 0 && i + 1 < argc) {
             snapshot = argv[++i];
+        } else if (strcmp(argv[i], "--traces") == 0 && i + 1 < argc) {
+            traces = argv[++i];
+        } else if (strcmp(argv[i], "--runs") == 0 && i + 1 < argc) {
+            runs = strtol(argv[++i], NULL, 10);
+            runs_given = true;
         } else {
             usage();
             return 2;
         }
     }
-    if (ticks < 0 || (!headless && (ticks != 0 || snapshot != NULL || at_given))) {
+    if (ticks < 0 || runs < 1 ||
+        (!headless && (ticks != 0 || snapshot != NULL || at_given || traces != NULL || runs_given))) {
         usage();
         return 2;
     }
@@ -167,6 +272,11 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    if (headless && traces != NULL) {
+        int result = run_traces(seed, runs, ticks > 0 ? ticks : 6000, traces);
+        free(fb);
+        return result;
+    }
     if (headless) {
         int result = run_headless(seed, ticks, at, snapshot, fb);
         free(fb);

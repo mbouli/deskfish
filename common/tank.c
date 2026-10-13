@@ -148,6 +148,7 @@ void tank_percept(const tank_t *t, int fish, percept_t *out)
     dist_t seen[SEE_COUNT];
     look(t, fish, seen);
 
+    out->species = f->species;
     out->hunger = need_digit(f->hunger);
     out->energy = need_digit(f->energy);
     out->stress = need_digit(f->stress);
@@ -193,7 +194,7 @@ static void pick_wander_target(tank_t *t, fish_t *f)
     f->want_front = rng_range(t, 0.0f, 1.0f) < FRONT_CHANCE; /* and maybe a change of depth */
 }
 
-void tank_init(tank_t *t, uint32_t seed)
+void tank_init_cast(tank_t *t, uint32_t seed, const species_t cast[TANK_FISH])
 {
     /* Zero everything, padding included, so two tanks can be compared byte for byte. */
     memset(t, 0, sizeof(*t));
@@ -205,8 +206,12 @@ void tank_init(tank_t *t, uint32_t seed)
 
     for (int i = 0; i < TANK_FISH; i++) {
         fish_t *f = &t->fish[i];
-        const species_info_t *info = species_info(CAST[i]);
-        f->species = CAST[i];
+        species_t kind = CAST[i];
+        if (cast != NULL && (int)cast[i] >= 0 && (int)cast[i] < SPECIES_COUNT) {
+            kind = cast[i];
+        }
+        const species_info_t *info = species_info(kind);
+        f->species = kind;
         f->bold = clamp_int(info->bold + rng_int(t, -1, 1), 0, 9);
         f->social = clamp_int(info->social + rng_int(t, -1, 1), 0, 9);
         f->x = rng_range(t, SWIM_X_MIN, SWIM_X_MAX);
@@ -227,6 +232,11 @@ void tank_init(tank_t *t, uint32_t seed)
     for (int i = 0; i < TANK_FISH; i++) {
         look(t, i, t->fish[i].seen); /* so the first tick sees no "change" */
     }
+}
+
+void tank_init(tank_t *t, uint32_t seed)
+{
+    tank_init_cast(t, seed, NULL);
 }
 
 void tank_set_brain(tank_t *t, brain_fn fn)

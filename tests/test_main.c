@@ -4,6 +4,7 @@ int test_failures;
 
 void test_brain(void);
 void test_gfx(void);
+void test_percept_text(void);
 void test_render(void);
 void test_scene(void);
 void test_sky(void);
@@ -21,6 +22,7 @@ int main(void)
     test_sky();
     test_light();
     test_brain();
+    test_percept_text();
     test_gfx();
     test_species();
     test_assets();

@@ -9,3 +9,6 @@ sim/deskfish_sim
 tests/tests
 *.dSYM/
 firmware/main/secrets.h
+model/out/*.txt
+model/out/*.pt
+__pycache__/
