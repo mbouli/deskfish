@@ -9,3 +9,6 @@ void app_init(uint32_t seed);
 /* Read input, advance, draw into fb and push it to the display.
  * fb is DISPLAY_W x DISPLAY_H. */
 void app_frame(uint16_t *fb);
+
+/* Draw the current scene into fb without reading input or pushing it. */
+void app_draw(uint16_t *fb);

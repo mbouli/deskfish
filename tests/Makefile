@@ -1,7 +1,7 @@
 CC ?= cc
 CFLAGS = -std=c11 -Wall -Wextra -Werror -O1 -g -fsanitize=address,undefined -I../common
-COMMON = ../common/gfx.c
-TESTS = test_main.c test_gfx.c
+COMMON = ../common/gfx.c ../common/species.c ../common/assets_data.c
+TESTS = test_main.c test_gfx.c test_species.c test_assets.c
 
 run: tests
 	./tests

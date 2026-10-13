@@ -1,42 +1,37 @@
 #include "app.h"
 
 #include "display.h"
-#include "gfx.h"
-#include "touch.h"
+#include "render.h"
 
-#define SQUARE 40
-
-static int x, y, dx, dy;
+/* A still line-up of the starting cast; Task 3 replaces this with the tank. */
+static const struct {
+    species_t species;
+    int x, y;
+    bool facing_left;
+} line_up[] = {
+    {SPECIES_CLOWNFISH, 160, 110, false},
+    {SPECIES_GOLDFISH, 90, 90, false},
+    {SPECIES_PUFFERFISH, 235, 130, true},
+    {SPECIES_CATFISH, 70, 185, false},
+    {SPECIES_ANGELFISH, 250, 70, true},
+};
 
 void app_init(uint32_t seed)
 {
     (void)seed;
-    x = 0;
-    y = 0;
-    dx = 3;
-    dy = 2;
+}
+
+void app_draw(uint16_t *fb)
+{
+    render_background(fb);
+    for (unsigned i = 0; i < sizeof(line_up) / sizeof(line_up[0]); i++) {
+        render_fish(fb, line_up[i].species, line_up[i].x, line_up[i].y, line_up[i].facing_left);
+    }
+    render_foreground(fb);
 }
 
 void app_frame(uint16_t *fb)
 {
-    x += dx;
-    y += dy;
-    if (x < 0 || x + SQUARE > DISPLAY_W) {
-        dx = -dx;
-        x += 2 * dx;
-    }
-    if (y < 0 || y + SQUARE > DISPLAY_H) {
-        dy = -dy;
-        y += 2 * dy;
-    }
-
-    gfx_fill(fb, RGB565(0, 0, 64));
-    gfx_fill_rect(fb, x, y, SQUARE, SQUARE, RGB565(255, 160, 0));
-
-    int tx, ty;
-    if (touch_read(&tx, &ty)) {
-        gfx_fill_rect(fb, tx - 4, ty - 4, 9, 9, RGB565(255, 255, 255));
-    }
-
+    app_draw(fb);
     display_push(fb, 0, 0, DISPLAY_W, DISPLAY_H);
 }
