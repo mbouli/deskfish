@@ -27,6 +27,12 @@ typedef enum {
     MOOD_COUNT
 } mood_t;
 
+/* A brain's whole answer. */
+typedef struct {
+    goal_t goal;
+    mood_t mood;
+} choice_t;
+
 /* How far away something is, roughly. */
 typedef enum { DIST_NONE, DIST_NEAR, DIST_MID, DIST_FAR } dist_t;
 

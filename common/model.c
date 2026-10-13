@@ -225,3 +225,168 @@ model_t *model_load(const uint8_t *data, size_t size)
     }
     return m;
 }
+
+/* ---- The arithmetic ---------------------------------------------------- */
+
+/* out = w x in + b, where w has n_out rows of n_in numbers. b may be NULL. */
+static void linear(const float *w, const float *b, const float *in, int n_in, float *out, int n_out)
+{
+    for (int o = 0; o < n_out; o++) {
+        float sum = b == NULL ? 0.0f : b[o];
+        const float *row = w + (size_t)o * (size_t)n_in;
+        for (int i = 0; i < n_in; i++) {
+            sum += row[i] * in[i];
+        }
+        out[o] = sum;
+    }
+}
+
+/* Shift and scale a row of numbers to mean 0 and spread 1, then apply the
+ * learned scale and shift. */
+static void layer_norm(const float *w, const float *b, const float *in, float *out, int n)
+{
+    float mean = 0.0f, var = 0.0f;
+    for (int i = 0; i < n; i++) {
+        mean += in[i];
+    }
+    mean /= (float)n;
+    for (int i = 0; i < n; i++) {
+        var += (in[i] - mean) * (in[i] - mean);
+    }
+    float inv = 1.0f / sqrtf(var / (float)n + 1e-5f);
+    for (int i = 0; i < n; i++) {
+        out[i] = (in[i] - mean) * inv * w[i] + b[i];
+    }
+}
+
+static float gelu(float x)
+{
+    return 0.5f * x * (1.0f + erff(x * 0.70710678f));
+}
+
+/* Run the tokens through the model; scores[v] is how strongly it expects word
+ * v to come next. */
+static void forward(model_t *m, const int *tokens, int count, float *scores)
+{
+    int e = m->embd, hw = e / m->heads;
+    float inv_sqrt = 1.0f / sqrtf((float)hw);
+
+    for (int t = 0; t < count; t++) {
+        const float *tok = m->tok_emb + (size_t)tokens[t] * (size_t)e;
+        const float *pos = m->pos_emb + (size_t)t * (size_t)e;
+        for (int i = 0; i < e; i++) {
+            m->x[t * e + i] = tok[i] + pos[i];
+        }
+    }
+
+    for (int l = 0; l < m->layers; l++) {
+        const block_t *k = &m->blocks[l];
+
+        /* Gather. Every token's query, key and value first... */
+        for (int t = 0; t < count; t++) {
+            layer_norm(k->norm1_w, k->norm1_b, m->x + t * e, m->normed, e);
+            linear(k->qkv_w, k->qkv_b, m->normed, e, m->qkv + t * 3 * e, 3 * e);
+        }
+        /* ...then each token looks back over itself and everything before it. */
+        for (int t = 0; t < count; t++) {
+            for (int h = 0; h < m->heads; h++) {
+                const float *q = m->qkv + t * 3 * e + h * hw;
+                float best = -INFINITY, total = 0.0f;
+                for (int u = 0; u <= t; u++) {
+                    const float *key = m->qkv + u * 3 * e + e + h * hw;
+                    float match = 0.0f;
+                    for (int i = 0; i < hw; i++) {
+                        match += q[i] * key[i];
+                    }
+                    m->weights[u] = match * inv_sqrt;
+                    if (m->weights[u] > best) {
+                        best = m->weights[u];
+                    }
+                }
+                for (int u = 0; u <= t; u++) { /* softmax: shares that add up to 1 */
+                    m->weights[u] = expf(m->weights[u] - best);
+                    total += m->weights[u];
+                }
+                float *got = m->gathered + h * hw;
+                memset(got, 0, (size_t)hw * sizeof(float));
+                for (int u = 0; u <= t; u++) {
+                    const float *value = m->qkv + u * 3 * e + 2 * e + h * hw;
+                    float share = m->weights[u] / total;
+                    for (int i = 0; i < hw; i++) {
+                        got[i] += share * value[i];
+                    }
+                }
+            }
+            linear(k->out_w, k->out_b, m->gathered, e, m->delta, e);
+            for (int i = 0; i < e; i++) {
+                m->x[t * e + i] += m->delta[i];
+            }
+        }
+
+        /* Digest. */
+        for (int t = 0; t < count; t++) {
+            layer_norm(k->norm2_w, k->norm2_b, m->x + t * e, m->normed, e);
+            linear(k->up_w, k->up_b, m->normed, e, m->hidden, 4 * e);
+            for (int i = 0; i < 4 * e; i++) {
+                m->hidden[i] = gelu(m->hidden[i]);
+            }
+            linear(k->down_w, k->down_b, m->hidden, 4 * e, m->delta, e);
+            for (int i = 0; i < e; i++) {
+                m->x[t * e + i] += m->delta[i];
+            }
+        }
+    }
+
+    layer_norm(m->norm_w, m->norm_b, m->x + (count - 1) * e, m->normed, e);
+    linear(m->to_vocab, NULL, m->normed, e, scores, m->vocab);
+}
+
+static int best_of(const float *scores, const int *candidates, int count)
+{
+    int best = 0;
+    for (int i = 1; i < count; i++) {
+        if (scores[candidates[i]] > scores[candidates[best]]) {
+            best = i;
+        }
+    }
+    return best;
+}
+
+bool model_choose(model_t *m, const percept_t *p, choice_t *out)
+{
+    char line[PERCEPT_TEXT_MAX];
+    int tokens[PROMPT_TOKENS + 1];
+    float scores[MAX_VOCAB];
+    int count = 0;
+    if (m == NULL || p == NULL || out == NULL || percept_encode(p, line, sizeof(line)) < 0) {
+        return false;
+    }
+    tokens[count++] = m->bos;
+    for (const char *w = line; *w != '\0';) {
+        const char *end = strchr(w, ' ');
+        size_t len = end == NULL ? strlen(w) : (size_t)(end - w);
+        int id = find_word(m, w, len);
+        if (id < 0 || count >= PROMPT_TOKENS - 1) {
+            return false;
+        }
+        tokens[count++] = id;
+        w += len;
+        if (*w == ' ') {
+            w++;
+        }
+    }
+    if (count != PROMPT_TOKENS - 1) {
+        return false;
+    }
+    tokens[count++] = m->sep;
+
+    forward(m, tokens, count, scores);
+    int goal = best_of(scores, m->goal_tok, GOAL_COUNT);
+    tokens[count++] = m->goal_tok[goal];
+    forward(m, tokens, count, scores);
+    int mood = best_of(scores, m->mood_tok, MOOD_COUNT);
+
+    out->goal = (goal_t)goal;
+    out->mood = (mood_t)mood;
+    return true;
+}

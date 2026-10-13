@@ -17,3 +17,8 @@ void model_free(model_t *m);
 
 /* How many learned numbers it holds. */
 size_t model_numbers(const model_t *m);
+
+/* Answer a fish's situation: the best-scoring goal, then the best-scoring
+ * mood. False, with *out untouched, if p is outside the schema. Not
+ * re-entrant: one model, one caller at a time. */
+bool model_choose(model_t *m, const percept_t *p, choice_t *out);
