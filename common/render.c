@@ -60,15 +60,15 @@ typedef struct {
 } sign_t;
 
 static const sign_t SIGNS[MOOD_COUNT] = {
-    [MOOD_EAGER] = {false, /* a firework: too fine for an outline */
-                    {RGB565(255, 214, 64), RGB565(255, 150, 40)},
-                    {"...b...",
-                     ".b.a.b.",
-                     "..a.a..",
-                     "ba...ab",
-                     "..a.a..",
-                     ".b.a.b.",
-                     "...b..."}},
+    [MOOD_EAGER] = {true, /* a lightning bolt */
+                    {RGB565(255, 214, 64)},
+                    {"....aa.",
+                     "...aa..",
+                     "..aa...",
+                     ".aaaaa.",
+                     "...aa..",
+                     "..aa...",
+                     ".aa...."}},
     [MOOD_WARY] = {true,
                    {RGB565(255, 128, 48)},
                    {"...a...",

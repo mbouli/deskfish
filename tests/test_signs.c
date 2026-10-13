@@ -16,7 +16,7 @@
 /* The colours each mood's sign may use, ending in 0. Black is never one of them. */
 static const uint16_t allowed[MOOD_COUNT][6] = {
     [MOOD_CALM] = {0},
-    [MOOD_EAGER] = {C565(255, 214, 64), C565(255, 150, 40), 0},
+    [MOOD_EAGER] = {C565(255, 214, 64), OUTLINE, 0},
     [MOOD_WARY] = {C565(255, 128, 48), OUTLINE, 0},
     [MOOD_PLAYFUL] = {C565(255, 128, 190), OUTLINE, 0},
     [MOOD_SLEEPY] = {C565(190, 220, 255), OUTLINE, 0},
