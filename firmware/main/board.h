@@ -19,14 +19,16 @@
 #define LCD_NATIVE_W      240
 #define LCD_NATIVE_H      320
 
-/* Panel quirks, found by looking at the test pattern (see the bring-up plan). */
+/* Panel quirks, found by looking at the test pattern (see the bring-up plan).
+ * LCD_MIRROR_X is 1 because the vendor start-up values in display.c reverse
+ * the panel's column scan direction (register B6). */
 #define LCD_BGR           1
 #define LCD_INVERT        1
 #define LCD_SWAP_XY       1
-#define LCD_MIRROR_X      0
+#define LCD_MIRROR_X      1
 #define LCD_MIRROR_Y      0
 
 /* Touch orientation, applied to the panel's native axes: mirror first, then swap. */
 #define TOUCH_SWAP_XY     1
-#define TOUCH_MIRROR_X    0
+#define TOUCH_MIRROR_X    1
 #define TOUCH_MIRROR_Y    0

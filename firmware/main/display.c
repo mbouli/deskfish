@@ -23,6 +23,35 @@
 
 static const char *TAG = "display";
 
+/* Start-up register values for this board's panel, from the vendor's
+ * ILI9341V_Init.txt (https://www.lcdwiki.com/2.8inch_ESP32-S3_Display).
+ * The driver's built-in defaults target a different ILI9341 panel: with them
+ * this one showed dark streaks in line with bright areas and held ghost
+ * images, because the drive voltages (C0, C1, C5, C7) were wrong for it.
+ * Sleep-out, pixel format, orientation, inversion and display-on are sent by
+ * the driver itself, so they are left out here. */
+static const ili9341_lcd_init_cmd_t panel_init[] = {
+    {0xCF, (uint8_t[]){0x00, 0xC1, 0x30}, 3, 0},             /* power control B */
+    {0xED, (uint8_t[]){0x64, 0x03, 0x12, 0x81}, 4, 0},       /* power-on sequence */
+    {0xE8, (uint8_t[]){0x85, 0x00, 0x78}, 3, 0},             /* driver timing A */
+    {0xCB, (uint8_t[]){0x39, 0x2C, 0x00, 0x34, 0x02}, 5, 0}, /* power control A */
+    {0xF7, (uint8_t[]){0x20}, 1, 0},                         /* pump ratio */
+    {0xEA, (uint8_t[]){0x00, 0x00}, 2, 0},                   /* driver timing B */
+    {0xC0, (uint8_t[]){0x13}, 1, 0},                         /* power control 1: drive voltage */
+    {0xC1, (uint8_t[]){0x13}, 1, 0},                         /* power control 2 */
+    {0xC5, (uint8_t[]){0x22, 0x35}, 2, 0},                   /* VCOM control 1 */
+    {0xC7, (uint8_t[]){0xBD}, 1, 0},                         /* VCOM control 2: offset */
+    {0xB6, (uint8_t[]){0x0A, 0xA2}, 2, 0},                   /* display function control */
+    {0xF6, (uint8_t[]){0x01, 0x30}, 2, 0},                   /* interface control */
+    {0xB1, (uint8_t[]){0x00, 0x1B}, 2, 0},                   /* frame rate */
+    {0xF2, (uint8_t[]){0x00}, 1, 0},                         /* 3-gamma off */
+    {0x26, (uint8_t[]){0x01}, 1, 0},                         /* gamma curve 1 */
+    {0xE0, (uint8_t[]){0x0F, 0x35, 0x31, 0x0B, 0x0E, 0x06, 0x49, 0xA7,
+                       0x33, 0x07, 0x0F, 0x03, 0x0C, 0x0A, 0x00}, 15, 0}, /* positive gamma */
+    {0xE1, (uint8_t[]){0x00, 0x0A, 0x0F, 0x04, 0x11, 0x08, 0x36, 0x58,
+                       0x4D, 0x07, 0x10, 0x0C, 0x32, 0x34, 0x0F}, 15, 0}, /* negative gamma */
+};
+
 static esp_lcd_panel_handle_t panel;
 static SemaphoreHandle_t sent;
 /* Byte-swapped copy of whatever is being sent. Owned here so callers may
@@ -76,10 +105,15 @@ void display_init(void)
     esp_lcd_panel_io_handle_t io;
     ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)LCD_HOST, &io_cfg, &io));
 
+    ili9341_vendor_config_t vendor_cfg = {
+        .init_cmds = panel_init,
+        .init_cmds_size = sizeof(panel_init) / sizeof(panel_init[0]),
+    };
     esp_lcd_panel_dev_config_t panel_cfg = {
         .reset_gpio_num = -1, /* no reset pin: the driver sends a software reset */
         .rgb_ele_order = LCD_BGR ? LCD_RGB_ELEMENT_ORDER_BGR : LCD_RGB_ELEMENT_ORDER_RGB,
         .bits_per_pixel = 16,
+        .vendor_config = &vendor_cfg,
     };
     ESP_ERROR_CHECK(esp_lcd_new_panel_ili9341(io, &panel_cfg, &panel));
     ESP_ERROR_CHECK(esp_lcd_panel_reset(panel));

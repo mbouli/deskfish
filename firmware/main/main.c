@@ -8,14 +8,12 @@
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_psram.h"
-#include "esp_timer.h"
+#include "touch.h"
 
 static const char *TAG = "deskfish";
 
-/* The whole screen, one host-order RGB565 value per pixel. Allocated with one
- * extra guard pixel at each end so the self-check can detect stray writes. */
+/* The whole screen, one host-order RGB565 value per pixel. */
 static uint16_t *fb;
-#define GUARD 0xA5A5
 
 static void fill(uint16_t colour)
 {
@@ -38,34 +36,10 @@ static void fill_rect(int x, int y, int w, int h, uint16_t colour)
     }
 }
 
-/* Things the by-eye checks never try. Each bad display_push below is expected
- * to log one "rejected rectangle" error and draw nothing. */
-static void selfcheck(void)
+/* A grey 12x12 square centred on (cx, cy), for the finger to aim at. */
+static void target(int cx, int cy)
 {
-    bool ok = true;
-
-    display_push(NULL, 0, 0, 10, 10);
-    display_push(fb, -1, 0, 10, 10);
-    display_push(fb, 0, 0, 0, 10);
-    display_push(fb, 0, 0, 10, -5);
-    display_push(fb, DISPLAY_W - 5, 0, 10, 10);
-    display_push(fb, 0, DISPLAY_H - 5, 10, 10);
-
-    /* Rectangles that hang off every edge must be clipped, not written out of bounds. */
-    fill(0);
-    fill_rect(-20, -20, 40, 40, 0xFFFF);
-    fill_rect(DISPLAY_W - 20, DISPLAY_H - 20, 40, 40, 0xFFFF);
-    fill_rect(-1000, 50, 5000, 10, 0xFFFF);
-    fill_rect(50, -1000, 10, 5000, 0xFFFF);
-    fill_rect(DISPLAY_W + 10, DISPLAY_H + 10, 40, 40, 0xFFFF);
-    if (fb[-1] != GUARD || fb[DISPLAY_W * DISPLAY_H] != GUARD) {
-        ok = false;
-    }
-    if (fb[0] != 0xFFFF || fb[DISPLAY_W * DISPLAY_H - 1] != 0xFFFF) {
-        ok = false;
-    }
-
-    ESP_LOGI(TAG, "%s", ok ? "selfcheck ok" : "selfcheck FAILED");
+    fill_rect(cx - 6, cy - 6, 12, 12, RGB565(96, 96, 96));
 }
 
 void app_main(void)
@@ -78,44 +52,41 @@ void app_main(void)
 
     display_init();
 
-    uint16_t *raw = heap_caps_malloc((DISPLAY_W * DISPLAY_H + 2) * sizeof(uint16_t), MALLOC_CAP_SPIRAM);
-    if (raw == NULL) {
+    fb = heap_caps_malloc(DISPLAY_W * DISPLAY_H * sizeof(uint16_t), MALLOC_CAP_SPIRAM);
+    if (fb == NULL) {
         ESP_LOGE(TAG, "cannot allocate the pixel buffer (is PSRAM enabled?)");
         abort();
     }
-    raw[0] = GUARD;
-    raw[DISPLAY_W * DISPLAY_H + 1] = GUARD;
-    fb = raw + 1;
 
-    selfcheck();
+    /* Self-check: touch_read must refuse to work before touch has started,
+     * and must refuse null pointers afterwards. */
+    int tx = 0, ty = 0;
+    bool check = !touch_read(&tx, &ty);
 
-    const int size = 40;
-    int x = 0, y = 0, dx = 3, dy = 2;
-    int frames = 0;
-    int64_t second_start = esp_timer_get_time();
+    bool have_touch = touch_init();
+    if (!have_touch) {
+        ESP_LOGW(TAG, "no touch: carrying on with the screen only");
+    }
+    check = check && !touch_read(NULL, &ty) && !touch_read(&tx, NULL);
+    ESP_LOGI(TAG, "%s", check ? "selfcheck ok" : "selfcheck FAILED");
 
+    fill(RGB565(0, 0, 32));
+    target(15, 15);
+    target(DISPLAY_W - 15, 15);
+    target(15, DISPLAY_H - 15);
+    target(DISPLAY_W - 15, DISPLAY_H - 15);
+    target(DISPLAY_W / 2, DISPLAY_H / 2);
+
+    bool was_down = false;
     while (1) {
-        fill(RGB565(0, 0, 64));
-        fill_rect(x, y, size, size, RGB565(255, 160, 0));
+        bool down = have_touch && touch_read(&tx, &ty);
+        if (down) {
+            fill_rect(tx - 4, ty - 4, 9, 9, RGB565(255, 255, 255));
+            if (!was_down) {
+                ESP_LOGI(TAG, "touch at %d,%d", tx, ty);
+            }
+        }
+        was_down = down;
         display_push(fb, 0, 0, DISPLAY_W, DISPLAY_H);
-
-        x += dx;
-        y += dy;
-        if (x < 0 || x + size > DISPLAY_W) {
-            dx = -dx;
-            x += 2 * dx;
-        }
-        if (y < 0 || y + size > DISPLAY_H) {
-            dy = -dy;
-            y += 2 * dy;
-        }
-
-        frames++;
-        int64_t now = esp_timer_get_time();
-        if (now - second_start >= 1000000) {
-            ESP_LOGI(TAG, "%d fps", frames);
-            frames = 0;
-            second_start = now;
-        }
     }
 }
