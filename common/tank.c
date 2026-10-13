@@ -279,6 +279,16 @@ static void begin_touch(tank_t *t, float x, float y)
     t->start_y = t->touch_y = y;
     t->touch_ticks = 0;
     t->touch_moved = false;
+
+    /* A finger landing close by is a fright, and a bigger one for shy fish. */
+    for (int i = 0; i < TANK_FISH; i++) {
+        fish_t *f = &t->fish[i];
+        if (distance(f->x, f->y, x, y) < STARTLE_PX) {
+            int jump = 9 - f->bold;
+            f->stress = clampf(f->stress + (float)(jump < 1 ? 1 : jump), 0.0f, NEED_MAX);
+            f->startled = true;
+        }
+    }
 }
 
 static void end_touch(tank_t *t)
@@ -347,7 +357,6 @@ static void update_pellets(tank_t *t)
 
 static void update_needs(tank_t *t, fish_t *f)
 {
-    (void)t;
     f->hunger += f->hunger_per_tick;
     if (f->goal == GOAL_REST) {
         f->energy += ENERGY_REST_PER_TICK;
@@ -355,6 +364,10 @@ static void update_needs(tank_t *t, fish_t *f)
         f->energy -= ENERGY_DRAIN_PER_TICK;
     }
     f->stress -= STRESS_DECAY_PER_TICK;
+    if (t->touching && f->bold <= SHY_BOLD_MAX &&
+        distance(f->x, f->y, t->touch_x, t->touch_y) < DIST_NEAR_PX) {
+        f->stress += STRESS_DECAY_PER_TICK + STRESS_SHY_PER_TICK; /* outpaces the calming */
+    }
 
     f->hunger = clampf(f->hunger, 0.0f, NEED_MAX);
     f->energy = clampf(f->energy, 0.0f, NEED_MAX);
@@ -438,6 +451,61 @@ static bool body_rest(tank_t *t, fish_t *f, steer_t *s)
     return true;
 }
 
+static bool body_flee(tank_t *t, fish_t *f, steer_t *s)
+{
+    if (!t->touching) {
+        return false;
+    }
+    float dx = f->x - t->touch_x, dy = f->y - t->touch_y;
+    float d = sqrtf(dx * dx + dy * dy);
+    if (d < 0.001f) { /* right under the finger: any direction will do */
+        dx = f->facing_left ? -1.0f : 1.0f;
+        dy = 0.0f;
+        d = 1.0f;
+    }
+    s->vx = dx / d * FLEE_SPEED;
+    s->vy = dy / d * FLEE_SPEED;
+    s->gain = FLEE_GAIN;
+    return true;
+}
+
+static bool body_investigate(tank_t *t, fish_t *f, steer_t *s)
+{
+    if (!t->touching) {
+        return false;
+    }
+    float dx = t->touch_x - f->x, dy = t->touch_y - f->y;
+    float d = sqrtf(dx * dx + dy * dy);
+    if (d > INVESTIGATE_GAP_PX + 8.0f) {
+        steer_to(f, t->touch_x, t->touch_y, INVESTIGATE_SPEED, 0.0f, s);
+        return true;
+    }
+    if (d < 0.001f) {
+        dx = 1.0f;
+        dy = 0.0f;
+        d = 1.0f;
+    }
+    /* Close enough: swim sideways to the finger, which makes a circle, and
+     * drift in or out to hold the gap. */
+    float in_x = dx / d, in_y = dy / d;
+    float drift = (d - INVESTIGATE_GAP_PX) * 0.5f;
+    s->vx = -in_y * CIRCLE_SPEED + in_x * drift;
+    s->vy = in_x * CIRCLE_SPEED + in_y * drift;
+    return true;
+}
+
+static bool body_hide(tank_t *t, fish_t *f, steer_t *s)
+{
+    (void)t;
+    float d = 0.0f;
+    int i = nearest_cover(f->x, f->y, &d);
+    if (i < 0) {
+        return false;
+    }
+    steer_to(f, tank_cover[i][0], tank_cover[i][1], HIDE_SPEED, HIDE_ARRIVE_PX, s);
+    return true;
+}
+
 static void steer(tank_t *t, int i, steer_t *s)
 {
     fish_t *f = &t->fish[i];
@@ -449,6 +517,15 @@ static void steer(tank_t *t, int i, steer_t *s)
         break;
     case GOAL_REST:
         done = body_rest(t, f, s);
+        break;
+    case GOAL_FLEE:
+        done = body_flee(t, f, s);
+        break;
+    case GOAL_INVESTIGATE:
+        done = body_investigate(t, f, s);
+        break;
+    case GOAL_HIDE:
+        done = body_hide(t, f, s);
         break;
     default:
         break;

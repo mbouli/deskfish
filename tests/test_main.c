@@ -8,6 +8,7 @@ void test_render(void);
 void test_species(void);
 void test_assets(void);
 void test_tank(void);
+void test_tank_finger(void);
 void test_app(void);
 
 int main(void)
@@ -17,6 +18,7 @@ int main(void)
     test_species();
     test_assets();
     test_tank();
+    test_tank_finger();
     test_app();
     test_render();
 
