@@ -81,8 +81,8 @@ void tank_set_brain(tank_t *t, brain_fn fn);
 /* Report the latest touch state. Call as often as you like between ticks. */
 void tank_set_finger(tank_t *t, bool down, int x, int y);
 
-/* Advance the tank by one tick. minutes is the time of day, 0..1439. */
-void tank_tick(tank_t *t, int minutes);
+/* Advance the tank by one tick. night is whether it is dark enough to rest. */
+void tank_tick(tank_t *t, bool night);
 
 /* Describe one fish's situation the way its brain sees it. */
 void tank_percept(const tank_t *t, int fish, percept_t *out);

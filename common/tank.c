@@ -68,11 +68,6 @@ static float distance(float ax, float ay, float bx, float by)
     return sqrtf(dx * dx + dy * dy);
 }
 
-static bool is_night(int minutes)
-{
-    return minutes < DAY_START_MIN || minutes >= NIGHT_START_MIN;
-}
-
 /* ---- Looking around ---------------------------------------------------- */
 
 static dist_t bucket(float d)
@@ -675,10 +670,10 @@ static void maybe_eat(tank_t *t, fish_t *f)
 
 /* ---- One tick ---------------------------------------------------------- */
 
-void tank_tick(tank_t *t, int minutes)
+void tank_tick(tank_t *t, bool night)
 {
     t->tick++;
-    t->night = is_night(minutes);
+    t->night = night;
     update_finger(t);
     update_pellets(t);
 

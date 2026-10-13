@@ -74,11 +74,9 @@ bool touch_read(int *x, int *y)
     return true;
 }
 
-int clock_minutes(void)
+int64_t clock_unix(void)
 {
-    time_t now = time(NULL);
-    struct tm *local = localtime(&now);
-    return local->tm_hour * 60 + local->tm_min;
+    return (int64_t)time(NULL);
 }
 
 uint32_t clock_millis(void)
@@ -102,7 +100,7 @@ bool sim_pump(void)
         case SDL_KEYDOWN:
             if (event.key.repeat == 0) {
                 SDL_Keycode key = event.key.keysym.sym;
-                if (key == SDLK_f || key == SDLK_r || key == SDLK_n || key == SDLK_d) {
+                if (key == SDLK_f || key == SDLK_r || key == SDLK_n || key == SDLK_d || key == SDLK_t) {
                     last_key = (int)key; /* SDL's letter codes are the ASCII letters */
                 }
             }

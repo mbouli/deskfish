@@ -43,9 +43,9 @@ static void test_same_seed_same_run(void)
         script_step(&sa, &a);
         script_step(&sb, &b);
         script_step(&sc, &c);
-        tank_tick(&a, NOON);
-        tank_tick(&b, NOON);
-        tank_tick(&c, NOON);
+        tank_tick(&a, DAY);
+        tank_tick(&b, DAY);
+        tank_tick(&c, DAY);
     }
     CHECK(a.tick == 3000);
     CHECK(memcmp(&a, &b, sizeof(tank_t)) == 0);
@@ -61,7 +61,7 @@ static void test_stays_inside_with_input(void)
         bool ok = true;
         for (int i = 0; i < 20000 && ok; i++) {
             script_step(&sc, &t);
-            tank_tick(&t, i < 10000 ? NOON : 0); /* half by day, half by night */
+            tank_tick(&t, i >= 10000); /* half by day, half by night */
             ok = all_ok(&t);
         }
         CHECK(ok);
@@ -79,7 +79,7 @@ static void test_fish_move(void)
         start_y[f] = t.fish[f].y;
     }
     for (int i = 0; i < 1200; i++) {
-        tank_tick(&t, NOON);
+        tank_tick(&t, DAY);
         for (int f = 0; f < TANK_FISH; f++) {
             float d = hypotf(t.fish[f].x - start_x[f], t.fish[f].y - start_y[f]);
             if (d > furthest[f]) {
@@ -112,7 +112,7 @@ static void test_depth_preference(void)
     run(&t, 800);
     bool catfish_low = true, angelfish_high = true;
     for (int i = 0; i < 6000; i++) {
-        tank_tick(&t, NOON);
+        tank_tick(&t, DAY);
         for (int f = 0; f < TANK_FISH; f++) {
             if (t.fish[f].species == SPECIES_CATFISH && t.fish[f].y < DEPTH_BOTTOM_MIN - 6.0f) {
                 catfish_low = false;
@@ -138,7 +138,7 @@ static void test_no_facing_flicker(void)
         was_left[f] = t.fish[f].facing_left;
     }
     for (int i = 0; i < 12000; i++) {
-        tank_tick(&t, NOON);
+        tank_tick(&t, DAY);
         for (int f = 0; f < TANK_FISH; f++) {
             bool flipped = t.fish[f].facing_left != was_left[f];
             flips[f] += flipped;
@@ -186,7 +186,7 @@ static void test_needs_stay_in_range(void)
     tank_set_brain(&t, always_wander);
     bool ok = true;
     for (int i = 0; i < 20000 && ok; i++) { /* long enough to hit both ends */
-        tank_tick(&t, NOON);
+        tank_tick(&t, DAY);
         ok = all_ok(&t);
     }
     CHECK(ok);
@@ -195,7 +195,7 @@ static void test_needs_stay_in_range(void)
 
     tank_set_brain(&t, always_rest);
     for (int i = 0; i < 5000 && ok; i++) {
-        tank_tick(&t, NOON);
+        tank_tick(&t, DAY);
         ok = all_ok(&t);
     }
     CHECK(ok);
@@ -235,18 +235,10 @@ static void test_night_flag(void)
 {
     tank_t t;
     tank_init(&t, 1);
-    tank_tick(&t, 0);
+    tank_tick(&t, NIGHT);
     CHECK(t.night);
-    tank_tick(&t, DAY_START_MIN - 1);
-    CHECK(t.night);
-    tank_tick(&t, DAY_START_MIN);
+    tank_tick(&t, DAY);
     CHECK(!t.night);
-    tank_tick(&t, NIGHT_START_MIN - 1);
-    CHECK(!t.night);
-    tank_tick(&t, NIGHT_START_MIN);
-    CHECK(t.night);
-    tank_tick(&t, 1439);
-    CHECK(t.night);
 }
 
 /* ---- Taps and pellets -------------------------------------------------- */
@@ -384,7 +376,7 @@ static void test_hungry_fish_reaches_food_and_eats(void)
         for (int f = 0; f < TANK_FISH; f++) {
             before[f] = t.fish[f].hunger;
         }
-        tank_tick(&t, NOON);
+        tank_tick(&t, DAY);
         if (pellet_count(&t) == 0) {
             eaten = true;
             for (int f = 0; f < TANK_FISH; f++) {
@@ -415,7 +407,7 @@ static void test_goal_without_target_is_wander(void)
     tank_set_brain(&t, always_seek_food); /* but there is no food */
     float x0 = t.fish[2].x, y0 = t.fish[2].y, furthest = 0.0f;
     for (int i = 0; i < 1200; i++) {
-        tank_tick(&t, NOON);
+        tank_tick(&t, DAY);
         float d = hypotf(t.fish[2].x - x0, t.fish[2].y - y0);
         furthest = d > furthest ? d : furthest;
     }

@@ -9,7 +9,8 @@
 #include "tank.h"
 #include "tuning.h"
 
-#define NOON (12 * 60)
+#define DAY false
+#define NIGHT true
 
 static inline bool inside(const fish_t *f)
 {
@@ -41,7 +42,7 @@ static inline bool all_ok(const tank_t *t)
 static inline void run(tank_t *t, int ticks)
 {
     for (int i = 0; i < ticks; i++) {
-        tank_tick(t, NOON);
+        tank_tick(t, DAY);
     }
 }
 
@@ -58,9 +59,9 @@ static inline int pellet_count(const tank_t *t)
 static inline void tap(tank_t *t, int x, int y)
 {
     tank_set_finger(t, true, x, y);
-    tank_tick(t, NOON);
+    tank_tick(t, DAY);
     tank_set_finger(t, false, x, y);
-    tank_tick(t, NOON);
+    tank_tick(t, DAY);
 }
 
 /* Park every fish somewhere, still, so a test controls the geometry. */

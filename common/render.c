@@ -46,7 +46,7 @@ static void draw_fish_layer(const tank_t *t, bool front, uint16_t *fb)
     }
 }
 
-void render_tank(const tank_t *t, int minutes, uint16_t *fb)
+void render_tank(const tank_t *t, uint16_t *fb)
 {
     /* Back fish, then the rocks and kelp, then front fish. */
     render_background(fb);
@@ -57,14 +57,6 @@ void render_tank(const tank_t *t, int minutes, uint16_t *fb)
         const pellet_t *p = &t->pellets[i];
         if (p->alive) {
             gfx_fill_rect(fb, (int)(p->x + 0.5f) - 1, (int)(p->y + 0.5f) - 1, 3, 3, PELLET_COLOUR);
-        }
-    }
-
-    if (minutes < DAY_START_MIN || minutes >= NIGHT_START_MIN) {
-        /* Halve every colour: shift right, then clear the bit that slid from
-         * red into green and from green into blue. */
-        for (int i = 0; i < DISPLAY_W * DISPLAY_H; i++) {
-            fb[i] = (fb[i] >> 1) & 0x7BEF;
         }
     }
 }

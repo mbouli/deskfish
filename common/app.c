@@ -4,6 +4,7 @@
 #include "display.h"
 #include "render.h"
 #include "touch.h"
+#include "tuning.h"
 
 #define MAX_TICKS_PER_FRAME 3
 
@@ -11,13 +12,32 @@ static tank_t tank;
 static uint32_t last_ms;
 static uint32_t owed_ms; /* tank time not yet run */
 static int speed = 1;
-static app_time_t time_mode = APP_TIME_REAL;
 
-void app_init(uint32_t seed)
+/* The sky clock is the real clock plus this, in milliseconds so a time-lapse
+ * can add a fraction of a second per frame. */
+static int64_t sky_offset_ms;
+static int sky_rate = 1;
+static int64_t lit_minute;
+static bool lit;
+static sky_t sky;
+static light_t light;
+static unsigned relights;
+
+static void relight(void)
+{
+    const place_t place = {PLACE_LAT_DEG, PLACE_LON_DEG};
+    sky_compute(app_sky_time(), place, &sky);
+    light_compute(&sky, &light);
+    relights++;
+}
+
+bool app_init(uint32_t seed)
 {
     tank_init(&tank, seed);
     last_ms = clock_millis();
     owed_ms = 0;
+    lit = false; /* light it on the first frame */
+    return true;
 }
 
 void app_set_speed(int multiplier)
@@ -25,9 +45,21 @@ void app_set_speed(int multiplier)
     speed = multiplier < 1 ? 1 : multiplier;
 }
 
-void app_set_time(app_time_t mode)
+void app_set_sky_rate(int multiplier)
 {
-    time_mode = mode;
+    sky_rate = multiplier < 1 ? 1 : multiplier;
+}
+
+void app_skip_sky(int64_t seconds)
+{
+    sky_offset_ms += seconds * 1000;
+}
+
+int64_t app_sky_time(void)
+{
+    /* Floor, not truncate, so a negative offset still rounds the same way. */
+    int64_t whole = sky_offset_ms >= 0 ? sky_offset_ms / 1000 : -((-sky_offset_ms + 999) / 1000);
+    return clock_unix() + whole;
 }
 
 const tank_t *app_tank(void)
@@ -35,23 +67,23 @@ const tank_t *app_tank(void)
     return &tank;
 }
 
-static int minutes_now(void)
+const sky_t *app_sky(void)
 {
-    switch (time_mode) {
-    case APP_TIME_NIGHT:
-        return 0;
-    case APP_TIME_DAY:
-        return 12 * 60;
-    case APP_TIME_REAL:
-    default:
-        return clock_minutes();
-    }
+    return &sky;
+}
+
+const light_t *app_light(void)
+{
+    return &light;
+}
+
+unsigned app_relights(void)
+{
+    return relights;
 }
 
 void app_frame(uint16_t *fb)
 {
-    int minutes = minutes_now();
-
     int tx = 0, ty = 0;
     bool down = touch_read(&tx, &ty);
     tank_set_finger(&tank, down, tx, ty);
@@ -66,16 +98,28 @@ void app_frame(uint16_t *fb)
     if (elapsed > cap_ms) {
         elapsed = cap_ms;
     }
+
+    /* A time-lapse pushes the sky clock ahead of the real one. */
+    sky_offset_ms += (int64_t)elapsed * (sky_rate - 1);
+
+    /* Work the light out again only when the sky clock reaches a new minute. */
+    int64_t sky_now = app_sky_time();
+    int64_t minute = sky_now >= 0 ? sky_now / 60 : -((-sky_now + 59) / 60);
+    if (!lit || minute != lit_minute) {
+        relight();
+        lit = true;
+        lit_minute = minute;
+    }
+
     owed_ms += elapsed * (uint32_t)speed;
     if (owed_ms > cap_ms * (uint32_t)speed) {
         owed_ms = cap_ms * (uint32_t)speed;
     }
-
     while (owed_ms >= TICK_MS) {
-        tank_tick(&tank, minutes);
+        tank_tick(&tank, light.fish_night);
         owed_ms -= TICK_MS;
     }
 
-    render_tank(&tank, minutes, fb);
+    render_tank(&tank, fb);
     display_push(fb, 0, 0, DISPLAY_W, DISPLAY_H);
 }

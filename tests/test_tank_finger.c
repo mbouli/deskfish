@@ -216,7 +216,7 @@ static void test_every_goal_stays_inside(void)
         bool ok = true;
         for (int i = 0; i < 6000 && ok; i++) {
             script_step(&sc, &t);
-            tank_tick(&t, NOON);
+            tank_tick(&t, DAY);
             ok = all_ok(&t);
         }
         CHECK(ok);

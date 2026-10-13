@@ -26,10 +26,6 @@
 #define PLACE_LAT_DEG 32.61f  /* Auburn, Alabama. North is positive. */
 #define PLACE_LON_DEG (-85.48f) /* East is positive. */
 
-/* Kept until Task 2 replaces the fixed schedule with the real sun. */
-#define DAY_START_MIN (6 * 60)
-#define NIGHT_START_MIN (20 * 60)
-
 /* --- Needs, 0..9 -------------------------------------------------------- */
 
 #define NEED_MAX 9.0f

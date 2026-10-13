@@ -1,14 +1,16 @@
+#include <math.h>
 #include <stdbool.h>
 #include <stdlib.h>
 
 #include "app.h"
 #include "display.h"
+#include "sky.h"
 #include "tank.h"
 #include "test.h"
 
 extern uint32_t stub_millis;
 extern int stub_pushes;
-extern int stub_minutes;
+extern int64_t stub_unix;
 extern bool stub_touch_down;
 extern int stub_touch_x, stub_touch_y;
 
@@ -106,26 +108,97 @@ static void test_touch_reaches_the_tank(void)
     CHECK(pellets == 1); /* that was a tap */
 }
 
-static void test_time_override(void)
+/* The sky clock's offset deliberately survives a restart, so each test here
+ * begins by putting it back in step with the (stub) real clock. */
+static void sync_sky(void)
+{
+    app_set_sky_rate(1);
+    app_skip_sky(stub_unix - app_sky_time());
+}
+
+static void test_sky_follows_the_clock(void)
 {
     stub_millis = 0;
-    stub_minutes = 12 * 60;
-    app_init(1);
-    app_set_speed(1);
-    app_set_time(APP_TIME_REAL);
+    stub_unix = sky_unix_from_utc(2026, 6, 21, 18, 0); /* about 1 pm in Auburn */
+    CHECK(app_init(1));
+    sync_sky();
     ticks_after(50);
+    CHECK(app_sky_time() == stub_unix);
+    CHECK(app_sky()->sun_up && app_sky()->sun_alt_deg > 60.0f);
     CHECK(!app_tank()->night);
-    app_set_time(APP_TIME_NIGHT);
+
+    stub_unix = sky_unix_from_utc(2026, 6, 22, 6, 0);  /* 1 am */
     ticks_after(50);
+    CHECK(!app_sky()->sun_up);
+    CHECK(app_light()->fish_night);
     CHECK(app_tank()->night);
-    stub_minutes = 0; /* really midnight, but day is forced */
-    app_set_time(APP_TIME_DAY);
+}
+
+static void test_relight_only_on_a_new_minute(void)
+{
+    stub_millis = 0;
+    stub_unix = sky_unix_from_utc(2026, 6, 21, 18, 0);
+    CHECK(app_init(1));
+    sync_sky();
     ticks_after(50);
-    CHECK(!app_tank()->night);
-    app_set_time(APP_TIME_REAL);
+    unsigned first = app_relights();
+    CHECK(first >= 1);         /* once at the start */
+    for (int i = 0; i < 20; i++) {
+        stub_unix += 2;        /* 40 seconds pass */
+        ticks_after(50);
+    }
+    CHECK(app_relights() == first);
+    stub_unix += 25;           /* into the next minute */
     ticks_after(50);
-    CHECK(app_tank()->night);
-    stub_minutes = 12 * 60;
+    CHECK(app_relights() == first + 1);
+    ticks_after(50);
+    CHECK(app_relights() == first + 1);
+}
+
+static void test_time_lapse(void)
+{
+    stub_millis = 0;
+    stub_unix = sky_unix_from_utc(2026, 6, 21, 18, 0);
+    CHECK(app_init(1));
+    sync_sky();
+    app_set_sky_rate(3600);    /* an hour of sky per second */
+    int64_t start = app_sky_time();
+    uint32_t tank_before = app_tank()->tick;
+    for (int i = 0; i < 20; i++) { /* one real second, in 50 ms frames */
+        ticks_after(50);
+    }
+    CHECK(app_sky_time() - start >= 3500 && app_sky_time() - start <= 3700);
+    CHECK(app_tank()->tick - tank_before == 20); /* the fish did not speed up */
+
+    app_set_sky_rate(1);
+    int64_t held = app_sky_time();
+    ticks_after(50);
+    CHECK(app_sky_time() - held <= 1);           /* and the sky stays where the lapse left it */
+    app_set_sky_rate(0);                         /* nonsense rates fall back to 1 */
+    ticks_after(50);
+    CHECK(app_sky_time() - held <= 1);
+}
+
+static void test_sky_jump(void)
+{
+    stub_millis = 0;
+    stub_unix = sky_unix_from_utc(2026, 6, 21, 18, 0);
+    CHECK(app_init(1));
+    sync_sky();
+    ticks_after(50);
+    unsigned before = app_relights();
+    app_skip_sky(3 * 3600);
+    ticks_after(50);
+    CHECK(app_sky_time() == stub_unix + 3 * 3600);
+    CHECK(app_relights() == before + 1);         /* one re-light, however far it jumped */
+
+    stub_unix += 400 * 86400;                    /* the real clock corrects by over a year */
+    ticks_after(50);
+    CHECK(app_relights() == before + 2);
+    CHECK(isfinite(app_sky()->sun_alt_deg));
+    app_skip_sky(-3 * 3600);                     /* and jumping back is allowed */
+    ticks_after(50);
+    CHECK(app_sky_time() == stub_unix);
 }
 
 void test_app(void)
@@ -138,6 +211,9 @@ void test_app(void)
     test_speed();
     test_restart();
     test_touch_reaches_the_tank();
-    test_time_override();
+    test_sky_follows_the_clock();
+    test_relight_only_on_a_new_minute();
+    test_time_lapse();
+    test_sky_jump();
     free(fb);
 }

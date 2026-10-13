@@ -22,51 +22,25 @@ static void test_pellet_is_drawn(void)
         place(&t, f, 300, 190); /* out of the way */
     }
 
-    render_tank(&t, NOON, fb);
+    render_tank(&t, fb);
     CHECK(at(fb, 50, 30) == asset_water); /* open water, above the art */
 
     t.pellets[3] = (pellet_t){.alive = true, .x = 50, .y = 30};
-    render_tank(&t, NOON, fb);
+    render_tank(&t, fb);
     CHECK(at(fb, 50, 30) == PELLET_COLOUR);
     CHECK(at(fb, 49, 29) == PELLET_COLOUR && at(fb, 51, 31) == PELLET_COLOUR); /* 3x3 */
     CHECK(at(fb, 52, 30) == asset_water);
 
     t.pellets[3].alive = false;
-    render_tank(&t, NOON, fb);
+    render_tank(&t, fb);
     CHECK(at(fb, 50, 30) == asset_water);
 
     /* A pellet at the very edge must not write outside the buffer. */
     t.pellets[0] = (pellet_t){.alive = true, .x = 0, .y = 0};
     t.pellets[1] = (pellet_t){.alive = true, .x = 319, .y = 239};
-    render_tank(&t, NOON, fb);
+    render_tank(&t, fb);
     CHECK(at(fb, 0, 0) == PELLET_COLOUR);
     free(fb);
-}
-
-static void test_night_is_dimmed(void)
-{
-    uint16_t *day = malloc(DISPLAY_W * DISPLAY_H * sizeof(uint16_t));
-    uint16_t *night = malloc(DISPLAY_W * DISPLAY_H * sizeof(uint16_t));
-    tank_t t;
-    tank_init(&t, 1);
-    t.pellets[0] = (pellet_t){.alive = true, .x = 50, .y = 30};
-
-    render_tank(&t, NOON, day);
-    render_tank(&t, 0, night);
-    bool every_pixel_halved = true;
-    for (int i = 0; i < DISPLAY_W * DISPLAY_H; i++) {
-        every_pixel_halved = every_pixel_halved && night[i] == ((day[i] >> 1) & 0x7BEF);
-    }
-    CHECK(every_pixel_halved);
-    CHECK(at(night, 0, 0) != at(day, 0, 0));
-
-    render_tank(&t, DAY_START_MIN, night); /* 06:00 is day */
-    CHECK(at(night, 0, 0) == at(day, 0, 0));
-    render_tank(&t, NIGHT_START_MIN, night); /* 20:00 is night */
-    CHECK(at(night, 0, 0) != at(day, 0, 0));
-
-    free(day);
-    free(night);
 }
 
 /* The box around every pixel that differs between two frames. */
@@ -97,18 +71,18 @@ static void test_layers_and_sizes(void)
         t.fish[f].front = false;
         t.fish[f].depth = 0.0f;
     }
-    render_tank(&t, NOON, empty);
+    render_tank(&t, empty);
     int x0, x1, n;
 
     /* Deep inside the big rock: a back fish is completely covered... */
     place(&t, 0, tank_cover[1][0], tank_cover[1][1]);
-    render_tank(&t, NOON, fb);
+    render_tank(&t, fb);
     changed_box(empty, fb, &x0, &x1, &n);
     CHECK(n == 0);
     /* ...and a front fish is drawn over the rock. */
     t.fish[0].front = true;
     t.fish[0].depth = 1.0f;
-    render_tank(&t, NOON, fb);
+    render_tank(&t, fb);
     changed_box(empty, fb, &x0, &x1, &n);
     CHECK(n > 100);
 
@@ -116,12 +90,12 @@ static void test_layers_and_sizes(void)
     place(&t, 0, 100, 60);
     t.fish[0].front = false;
     t.fish[0].depth = 0.0f;
-    render_tank(&t, NOON, fb);
+    render_tank(&t, fb);
     changed_box(empty, fb, &x0, &x1, &n);
     int back_width = x1 - x0 + 1;
     t.fish[0].front = true;
     t.fish[0].depth = 1.0f;
-    render_tank(&t, NOON, fb);
+    render_tank(&t, fb);
     changed_box(empty, fb, &x0, &x1, &n);
     int front_width = x1 - x0 + 1;
     CHECK(front_width <= FISH_FRONT_PX && back_width <= FISH_BACK_PX);
@@ -136,5 +110,4 @@ void test_render(void)
 {
     test_layers_and_sizes();
     test_pellet_is_drawn();
-    test_night_is_dimmed();
 }

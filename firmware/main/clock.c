@@ -2,16 +2,18 @@
 
 #include "esp_timer.h"
 
-/* The board has no battery-backed clock yet: every boot starts at 12:00. */
-#define BOOT_MINUTES (12 * 60)
+/* Until Task 4 gives the board Wi-Fi, it believes it is the moment the
+ * firmware was built, and counts up from there. */
+#ifndef BUILD_EPOCH
+#define BUILD_EPOCH 0
+#endif
 
 uint32_t clock_millis(void)
 {
     return (uint32_t)(esp_timer_get_time() / 1000);
 }
 
-int clock_minutes(void)
+int64_t clock_unix(void)
 {
-    int64_t minutes = esp_timer_get_time() / 60000000;
-    return (int)((BOOT_MINUTES + minutes) % (24 * 60));
+    return (int64_t)BUILD_EPOCH + esp_timer_get_time() / 1000000;
 }

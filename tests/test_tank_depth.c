@@ -48,7 +48,7 @@ static void test_layer_changes_only_in_open_water(void)
             was_front[f] = t.fish[f].front;
         }
         for (int i = 0; i < 20000; i++) {
-            tank_tick(&t, NOON);
+            tank_tick(&t, DAY);
             for (int f = 0; f < TANK_FISH; f++) {
                 if (t.fish[f].front != was_front[f]) {
                     flips++;
@@ -73,7 +73,7 @@ static void test_depth_eases(void)
         last[f] = t.fish[f].depth;
     }
     for (int i = 0; i < 20000; i++) {
-        tank_tick(&t, NOON);
+        tank_tick(&t, DAY);
         for (int f = 0; f < TANK_FISH; f++) {
             float d = t.fish[f].depth;
             ok = ok && d >= 0.0f && d <= 1.0f && fabsf(d - last[f]) <= 0.2f; /* no jumps in size */

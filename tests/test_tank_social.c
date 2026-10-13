@@ -50,7 +50,7 @@ static void test_school_keeps_moving(void)
         y0[f] = t.fish[f].y;
     }
     for (int i = 0; i < 1200; i++) {
-        tank_tick(&t, NOON);
+        tank_tick(&t, DAY);
         for (int f = 0; f < TANK_FISH; f++) {
             float d = hypotf(t.fish[f].x - x0[f], t.fish[f].y - y0[f]);
             furthest = d > furthest ? d : furthest;
@@ -67,7 +67,7 @@ static void test_fish_keep_apart(void)
     int crowded = 0;
     const int ticks = 20000;
     for (int i = 0; i < ticks; i++) {
-        tank_tick(&t, NOON);
+        tank_tick(&t, DAY);
         bool close = false;
         for (int a = 0; a < TANK_FISH; a++) {
             for (int b = a + 1; b < TANK_FISH; b++) {
@@ -105,8 +105,8 @@ static void test_night_costs_more_energy(void)
     tank_set_brain(&night, always_wander);
     day.fish[0].energy = night.fish[0].energy = 8.0f;
     for (int i = 0; i < 200; i++) {
-        tank_tick(&day, NOON);
-        tank_tick(&night, 0);
+        tank_tick(&day, DAY);
+        tank_tick(&night, NIGHT);
     }
     float day_cost = 8.0f - day.fish[0].energy;
     float night_cost = 8.0f - night.fish[0].energy;
@@ -123,13 +123,13 @@ static void test_fish_sleep_at_night_and_wake(void)
         t.fish[f].energy = 9.0f;
     }
     for (int i = 0; i < 400; i++) {
-        tank_tick(&t, 0);
+        tank_tick(&t, NIGHT);
     }
     for (int f = 0; f < TANK_FISH; f++) {
         CHECK(t.fish[f].goal == GOAL_REST);
     }
     for (int i = 0; i < DECIDE_TICKS * 2; i++) {
-        tank_tick(&t, NOON);
+        tank_tick(&t, DAY);
     }
     for (int f = 0; f < TANK_FISH; f++) {
         CHECK(t.fish[f].goal != GOAL_REST); /* fully rested, so up at dawn */

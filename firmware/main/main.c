@@ -33,7 +33,10 @@ void app_main(void)
         abort();
     }
 
-    app_init(esp_random());
+    if (!app_init(esp_random())) {
+        ESP_LOGE(TAG, "cannot allocate the lit pictures (is PSRAM enabled?)");
+        abort();
+    }
 
     int frames = 0;
     uint32_t second_start = clock_millis();
