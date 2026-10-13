@@ -8,3 +8,4 @@ firmware/managed_components/
 sim/deskfish_sim
 tests/tests
 *.dSYM/
+firmware/main/secrets.h
