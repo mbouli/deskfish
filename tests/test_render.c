@@ -69,8 +69,72 @@ static void test_night_is_dimmed(void)
     free(night);
 }
 
+/* The box around every pixel that differs between two frames. */
+static void changed_box(const uint16_t *a, const uint16_t *b, int *x0, int *x1, int *n)
+{
+    *x0 = DISPLAY_W;
+    *x1 = -1;
+    *n = 0;
+    for (int y = 0; y < DISPLAY_H; y++) {
+        for (int x = 0; x < DISPLAY_W; x++) {
+            if (at(a, x, y) != at(b, x, y)) {
+                *x0 = x < *x0 ? x : *x0;
+                *x1 = x > *x1 ? x : *x1;
+                (*n)++;
+            }
+        }
+    }
+}
+
+static void test_layers_and_sizes(void)
+{
+    uint16_t *empty = malloc(DISPLAY_W * DISPLAY_H * sizeof(uint16_t));
+    uint16_t *fb = malloc(DISPLAY_W * DISPLAY_H * sizeof(uint16_t));
+    tank_t t;
+    tank_init(&t, 1);
+    for (int f = 0; f < TANK_FISH; f++) {
+        place(&t, f, 300, 30); /* stack them all in one corner */
+        t.fish[f].front = false;
+        t.fish[f].depth = 0.0f;
+    }
+    render_tank(&t, NOON, empty);
+    int x0, x1, n;
+
+    /* Deep inside the big rock: a back fish is completely covered... */
+    place(&t, 0, tank_cover[1][0], tank_cover[1][1]);
+    render_tank(&t, NOON, fb);
+    changed_box(empty, fb, &x0, &x1, &n);
+    CHECK(n == 0);
+    /* ...and a front fish is drawn over the rock. */
+    t.fish[0].front = true;
+    t.fish[0].depth = 1.0f;
+    render_tank(&t, NOON, fb);
+    changed_box(empty, fb, &x0, &x1, &n);
+    CHECK(n > 100);
+
+    /* In open water, a back fish is drawn a little smaller than a front one. */
+    place(&t, 0, 100, 60);
+    t.fish[0].front = false;
+    t.fish[0].depth = 0.0f;
+    render_tank(&t, NOON, fb);
+    changed_box(empty, fb, &x0, &x1, &n);
+    int back_width = x1 - x0 + 1;
+    t.fish[0].front = true;
+    t.fish[0].depth = 1.0f;
+    render_tank(&t, NOON, fb);
+    changed_box(empty, fb, &x0, &x1, &n);
+    int front_width = x1 - x0 + 1;
+    CHECK(front_width <= FISH_FRONT_PX && back_width <= FISH_BACK_PX);
+    CHECK(front_width > back_width);
+    CHECK(front_width - back_width <= 6); /* slight, not dramatic */
+
+    free(empty);
+    free(fb);
+}
+
 void test_render(void)
 {
+    test_layers_and_sizes();
     test_pellet_is_drawn();
     test_night_is_dimmed();
 }

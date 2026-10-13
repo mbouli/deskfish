@@ -26,3 +26,7 @@ void gfx_blit(uint16_t *fb, const image_t *img, int x, int y);
 /* Copy an image, skipping GFX_KEY pixels, enlarged by a whole-number scale and
  * optionally mirrored left-to-right. A scale below 1 draws nothing. */
 void gfx_blit_keyed(uint16_t *fb, const image_t *img, int x, int y, int scale, bool mirror);
+
+/* Copy an image, skipping GFX_KEY pixels, stretched or shrunk to exactly
+ * out_w x out_h and optionally mirrored. A size below 1 draws nothing. */
+void gfx_blit_fit(uint16_t *fb, const image_t *img, int x, int y, int out_w, int out_h, bool mirror);

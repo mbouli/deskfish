@@ -13,6 +13,8 @@ BG_DIR = ROOT / "assets" / "bg_inspo" / "03"
 OUT = ROOT / "common" / "assets_data.c"
 
 SCREEN_W = 320
+SCREEN_H = 240
+MASK_CELL = 8  # must match ASSET_MASK_CELL in common/assets.h
 KEY = 0xF81F  # must match GFX_KEY in common/gfx.h
 
 # Alphabetical, matching species_t in common/species.h.
@@ -76,6 +78,20 @@ def main():
     parts.append(c_array("back_px", back_px))
     parts.append("")
     parts.append(c_array("front_px", pixels(front, keyed=True)))
+    parts.append("")
+
+    # A coarse map of the screen: 1 where a cell holds any foreground art.
+    art_top = SCREEN_H - front.height
+    alpha = front.getchannel("A")
+    parts.append(f"const uint8_t asset_front_mask[{SCREEN_H // MASK_CELL}][{SCREEN_W // MASK_CELL}] = {{")
+    for top in range(0, SCREEN_H, MASK_CELL):
+        row = []
+        for left in range(0, SCREEN_W, MASK_CELL):
+            box = (left, max(top - art_top, 0), left + MASK_CELL, top + MASK_CELL - art_top)
+            covered = box[3] > 0 and alpha.crop(box).getextrema()[1] >= 128
+            row.append("1" if covered else "0")
+        parts.append("    {" + ", ".join(row) + "},")
+    parts.append("};")
     parts.append("")
 
     parts.append("const image_t asset_fish[SPECIES_COUNT] = {")

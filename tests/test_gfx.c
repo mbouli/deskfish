@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stdlib.h>
 
 #include "gfx.h"
@@ -164,6 +165,49 @@ static void test_blit_keyed_clips(void)
     free(fb);
 }
 
+static void test_blit_fit(void)
+{
+    uint16_t *a = new_fb(0x7777), *b = new_fb(0x7777);
+    /* Fitting a 3x2 picture into 6x4 is the same as drawing it at 2x. */
+    gfx_blit_keyed(a, &tiny, 10, 10, 2, false);
+    gfx_blit_fit(b, &tiny, 10, 10, 6, 4, false);
+    bool same = true;
+    for (int i = 0; i < PIXELS; i++) {
+        same = same && a[i] == b[i];
+    }
+    CHECK(same);
+    free(a);
+    free(b);
+
+    uint16_t *fb = new_fb(0x7777);
+    gfx_blit_fit(fb, &tiny, 20, 20, 3, 2, true); /* own size, mirrored:  K B A  /  D K C */
+    CHECK(at(fb, 20, 20) == 0x7777 && at(fb, 21, 20) == B && at(fb, 22, 20) == A);
+    CHECK(at(fb, 20, 21) == D && at(fb, 22, 21) == C);
+
+    /* An in-between size: 5 wide from 3 columns. Screen column c takes source
+     * column c * 3 / 5, so the columns come out as A A B B K, and nothing
+     * lands outside 5x2. */
+    gfx_fill(fb, 0x7777);
+    gfx_blit_fit(fb, &tiny, 40, 40, 5, 2, false);
+    CHECK(at(fb, 40, 40) == A && at(fb, 41, 40) == A);
+    CHECK(at(fb, 42, 40) == B && at(fb, 43, 40) == B);
+    CHECK(at(fb, 44, 40) == 0x7777); /* the key column */
+    CHECK(at(fb, 44, 41) == D);
+    CHECK(at(fb, 45, 40) == 0x7777 && at(fb, 40, 42) == 0x7777);
+
+    int before = count(fb, 0x7777);
+    gfx_blit_fit(fb, &tiny, 60, 60, 0, 4, false); /* nonsense sizes draw nothing */
+    gfx_blit_fit(fb, &tiny, 60, 60, 4, -1, false);
+    CHECK(count(fb, 0x7777) == before);
+
+    /* Hanging off every edge: AddressSanitizer is the judge. */
+    gfx_blit_fit(fb, &tiny, -5, -5, 28, 28, false);
+    gfx_blit_fit(fb, &tiny, DISPLAY_W - 9, DISPLAY_H - 9, 28, 28, true);
+    gfx_blit_fit(fb, &tiny, -100, 50, 28, 28, false);
+    gfx_blit_fit(fb, &tiny, 50, DISPLAY_H + 3, 28, 28, false);
+    free(fb);
+}
+
 void test_gfx(void)
 {
     test_fill();
@@ -174,4 +218,5 @@ void test_gfx(void)
     test_blit_keyed_mirror();
     test_blit_keyed_scale();
     test_blit_keyed_clips();
+    test_blit_fit();
 }

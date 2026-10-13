@@ -26,6 +26,11 @@ typedef struct {
     int bold, social; /* 0..9: the species' values, nudged per fish */
     bool facing_left;
 
+    bool front;      /* drawn in front of the rocks and kelp, not behind */
+    bool want_front; /* the layer it would like to be on */
+    float depth;     /* 0 = back, 1 = front; follows `front` smoothly, for drawn size */
+    int layer_wait;  /* ticks a hiding fish has waited for open water */
+
     float hunger, energy, stress; /* 0..9, kept as fractions so they change smoothly */
     float hunger_per_tick;        /* appetite: its species' rate, nudged per fish */
     goal_t goal;

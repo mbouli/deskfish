@@ -10,6 +10,7 @@ void test_assets(void);
 void test_tank(void);
 void test_tank_finger(void);
 void test_tank_social(void);
+void test_tank_depth(void);
 void test_app(void);
 
 int main(void)
@@ -21,6 +22,7 @@ int main(void)
     test_tank();
     test_tank_finger();
     test_tank_social();
+    test_tank_depth();
     test_app();
     test_render();
 

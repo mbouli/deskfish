@@ -527,6 +527,7 @@ static void test_fish_are_asked_in_turn_and_regularly(void)
      * still and no sighting changes bucket during the test. */
     for (int f = 0; f < TANK_FISH; f++) {
         place(&t, f, 30.0f + 65.0f * (float)f, REST_Y);
+        t.fish[f].goal = GOAL_REST; /* resting from the start, not whenever first asked */
     }
     run(&t, 1); /* lets every fish register its new surroundings */
     calls = 0;

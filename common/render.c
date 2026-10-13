@@ -5,8 +5,6 @@
 #include "gfx.h"
 #include "tuning.h"
 
-#define FISH_SCALE 2
-
 /* The art is shorter than the screen: it sits at the bottom, under plain water. */
 static int art_top(void)
 {
@@ -19,14 +17,12 @@ void render_background(uint16_t *fb)
     gfx_blit(fb, &asset_back, 0, art_top());
 }
 
-void render_fish(uint16_t *fb, species_t s, int cx, int cy, bool facing_left)
+void render_fish(uint16_t *fb, species_t s, int cx, int cy, bool facing_left, int size_px)
 {
     if ((int)s < 0 || (int)s >= SPECIES_COUNT) {
         return;
     }
-    const image_t *sprite = &asset_fish[s];
-    gfx_blit_keyed(fb, sprite, cx - sprite->w * FISH_SCALE / 2, cy - sprite->h * FISH_SCALE / 2,
-                   FISH_SCALE, facing_left);
+    gfx_blit_fit(fb, &asset_fish[s], cx - size_px / 2, cy - size_px / 2, size_px, size_px, facing_left);
 }
 
 void render_foreground(uint16_t *fb)
@@ -36,14 +32,27 @@ void render_foreground(uint16_t *fb)
 
 #define PELLET_COLOUR RGB565(214, 170, 96)
 
-void render_tank(const tank_t *t, int minutes, uint16_t *fb)
+static void draw_fish_layer(const tank_t *t, bool front, uint16_t *fb)
 {
-    render_background(fb);
     for (int i = 0; i < TANK_FISH; i++) {
         const fish_t *f = &t->fish[i];
-        render_fish(fb, f->species, (int)(f->x + 0.5f), (int)(f->y + 0.5f), f->facing_left);
+        if (f->front != front) {
+            continue;
+        }
+        /* Nearer fish look a little bigger. The size follows `depth`, which
+         * eases between layers, so a fish never jumps in size. */
+        int size = FISH_BACK_PX + (int)((float)(FISH_FRONT_PX - FISH_BACK_PX) * f->depth + 0.5f);
+        render_fish(fb, f->species, (int)(f->x + 0.5f), (int)(f->y + 0.5f), f->facing_left, size);
     }
+}
+
+void render_tank(const tank_t *t, int minutes, uint16_t *fb)
+{
+    /* Back fish, then the rocks and kelp, then front fish. */
+    render_background(fb);
+    draw_fish_layer(t, false, fb);
     render_foreground(fb);
+    draw_fish_layer(t, true, fb);
     for (int i = 0; i < TANK_PELLETS; i++) {
         const pellet_t *p = &t->pellets[i];
         if (p->alive) {

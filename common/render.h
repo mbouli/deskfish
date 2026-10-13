@@ -10,8 +10,8 @@
 
 void render_background(uint16_t *fb);
 
-/* Draw one fish centred on (cx, cy). */
-void render_fish(uint16_t *fb, species_t s, int cx, int cy, bool facing_left);
+/* Draw one fish centred on (cx, cy), size_px wide and tall. */
+void render_fish(uint16_t *fb, species_t s, int cx, int cy, bool facing_left, int size_px);
 
 void render_foreground(uint16_t *fb);
 

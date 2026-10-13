@@ -54,10 +54,10 @@ static void print_fish(const tank_t *tank)
         percept_t p;
         tank_percept(tank, i, &p);
         printf("  %-11s %-11s hunger %d energy %d stress %d | bold %d social %d | "
-               "food %-4s friend %-4s finger %-4s cover %-4s | at %3.0f,%3.0f\n",
+               "food %-4s friend %-4s finger %-4s cover %-4s | at %3.0f,%3.0f %s\n",
                species_info(f->species)->name, goal_name(f->goal), p.hunger, p.energy, p.stress,
                p.bold, p.social, dist_name(p.food), dist_name(p.friend_), dist_name(p.finger),
-               dist_name(p.cover), (double)f->x, (double)f->y);
+               dist_name(p.cover), (double)f->x, (double)f->y, f->front ? "front" : "back");
     }
 }
 

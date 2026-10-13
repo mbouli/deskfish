@@ -3,6 +3,7 @@
 #include <math.h>
 #include <string.h>
 
+#include "assets.h"
 #include "tuning.h"
 
 #define TICK_S (TICK_MS / 1000.0f)
@@ -194,6 +195,7 @@ static void pick_wander_target(tank_t *t, fish_t *f)
     f->tx = rng_range(t, SWIM_X_MIN, SWIM_X_MAX);
     f->ty = rng_range(t, lo, hi);
     f->target_ticks = rng_int(t, WANDER_MIN_TICKS, WANDER_MAX_TICKS);
+    f->want_front = rng_range(t, 0.0f, 1.0f) < FRONT_CHANCE; /* and maybe a change of depth */
 }
 
 void tank_init(tank_t *t, uint32_t seed)
@@ -224,6 +226,8 @@ void tank_init(tank_t *t, uint32_t seed)
         f->goal = GOAL_WANDER;
         f->decide_ticks = 1 + i * DECIDE_STAGGER_TICKS; /* fish take turns */
         pick_wander_target(t, f);
+        f->front = f->want_front; /* starts on its chosen layer, at that layer's size */
+        f->depth = f->front ? 1.0f : 0.0f;
     }
     for (int i = 0; i < TANK_FISH; i++) {
         look(t, i, t->fish[i].seen); /* so the first tick sees no "change" */
@@ -618,6 +622,44 @@ static void move(fish_t *f, const steer_t *s)
     }
 }
 
+/* ---- Depth ------------------------------------------------------------- */
+
+/* True if there is no foreground art within `half` pixels of (x, y). */
+static bool water_is_clear(float x, float y, float half)
+{
+    int c0 = (int)floorf((x - half) / ASSET_MASK_CELL), c1 = (int)floorf((x + half) / ASSET_MASK_CELL);
+    int r0 = (int)floorf((y - half) / ASSET_MASK_CELL), r1 = (int)floorf((y + half) / ASSET_MASK_CELL);
+    for (int r = r0; r <= r1; r++) {
+        for (int c = c0; c <= c1; c++) {
+            if (r >= 0 && r < ASSET_MASK_ROWS && c >= 0 && c < ASSET_MASK_COLS && asset_front_mask[r][c]) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+static void update_layer(fish_t *f)
+{
+    bool hiding = f->goal == GOAL_HIDE;
+    bool want = hiding ? false : f->want_front; /* hiding always means behind the art */
+    if (f->front == want) {
+        f->layer_wait = 0;
+    } else if (water_is_clear(f->x, f->y, LAYER_CLEAR_HALF_PX)) {
+        f->front = want; /* in open water nobody sees the switch */
+        f->layer_wait = 0;
+    } else if (hiding && ++f->layer_wait >= LAYER_FORCE_TICKS) {
+        f->front = false; /* stuck in front of a rock: better a small pop than hiding in plain view */
+        f->layer_wait = 0;
+    }
+
+    float target = f->front ? 1.0f : 0.0f;
+    f->depth += (target - f->depth) * LAYER_EASE;
+    if (fabsf(target - f->depth) < 0.01f) {
+        f->depth = target;
+    }
+}
+
 static void maybe_eat(tank_t *t, fish_t *f)
 {
     if (f->goal != GOAL_SEEK_FOOD) {
@@ -647,6 +689,7 @@ void tank_tick(tank_t *t, int minutes)
         maybe_decide(t, i);
         steer(t, i, &s);
         move(f, &s);
+        update_layer(f);
         maybe_eat(t, f);
     }
 }

@@ -86,5 +86,14 @@
 #define SCHOOL_BAND_PX 10.0f
 #define SCHOOL_MIN_FRIEND_SPEED 5.0f  /* a friend slower than this is not worth following */
 
+/* --- Depth: in front of or behind the rocks and kelp --------------------- */
+
+#define FRONT_CHANCE 0.5f             /* how often a wandering fish picks the front layer */
+#define LAYER_CLEAR_HALF_PX 24.0f     /* open water needed around a fish before it changes layer */
+#define LAYER_FORCE_TICKS 20          /* a hiding fish stuck in front switches anyway after 1 second */
+#define LAYER_EASE 0.15f              /* how fast its drawn size follows the change, per tick */
+#define FISH_BACK_PX 28               /* drawn size behind the art... */
+#define FISH_FRONT_PX 32              /* ...and in front of it */
+
 #define SEPARATION_PX 22.0f           /* closer than this, fish push apart */
 #define SEPARATION_PUSH 45.0f
