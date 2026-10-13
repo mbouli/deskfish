@@ -22,3 +22,13 @@ size_t model_numbers(const model_t *m);
  * mood. False, with *out untouched, if p is outside the schema. Not
  * re-entrant: one model, one caller at a time. */
 bool model_choose(model_t *m, const percept_t *p, choice_t *out);
+
+/* The model gives the same answer to the same situation every time, so it
+ * keeps recent answers and gives them again without working them out. This
+ * is on to begin with; turning it off, or on again, forgets them all. */
+void model_remember(model_t *m, bool on);
+unsigned model_recalled(const model_t *m); /* answers given from memory so far */
+
+/* Where models loaded from now on keep their numbers: for a board with a
+ * small fast memory and a large slow one. NULL for both is the ordinary kind. */
+void model_use_memory(void *(*alloc)(size_t size), void (*release)(void *p));

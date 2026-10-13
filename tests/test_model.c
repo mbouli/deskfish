@@ -219,6 +219,148 @@ static void test_same_seed_same_tank(model_t *m)
     CHECK(some_mood); /* the model's moods did reach the fish */
 }
 
+/* ---- Remembering answers ----------------------------------------------- */
+
+/* A stream of situations with plenty of repeats and near-repeats. */
+static void next_percept(uint32_t *state, percept_t *p)
+{
+    uint32_t r[4];
+    for (int i = 0; i < 4; i++) {
+        *state = *state * 1664525u + 1013904223u;
+        r[i] = *state >> 8;
+    }
+    memset(p, 0, sizeof(*p));
+    p->species = (species_t)(r[0] % SPECIES_COUNT);
+    p->hunger = (int)(r[0] / 7 % 10);
+    p->energy = (int)(r[0] / 70 % 3) + 5; /* a narrow range, so questions come round again */
+    p->stress = (int)(r[1] % 3);
+    p->bold = (int)(r[1] / 3 % 10);
+    p->social = (int)(r[1] / 30 % 2) + 4;
+    p->night = r[2] % 5 == 0;
+    p->startled = r[2] / 5 % 7 == 0;
+    p->current = (goal_t)(r[2] / 35 % GOAL_COUNT);
+    p->food = (dist_t)(r[3] % 4);
+    p->friend_ = (dist_t)(r[3] / 4 % 4);
+    p->finger = (dist_t)(r[3] / 16 % 4);
+    p->cover = (dist_t)(r[3] / 64 % 4);
+}
+
+static void test_remembered_answers_are_the_same(const uint8_t *data, size_t size)
+{
+    model_t *quick = model_load(data, size), *plain = model_load(data, size);
+    CHECK(quick != NULL && plain != NULL);
+    if (quick == NULL || plain == NULL) {
+        model_free(quick);
+        model_free(plain);
+        return;
+    }
+    model_remember(plain, false);
+    CHECK(model_recalled(quick) == 0);
+
+    uint32_t state = 5;
+    percept_t p;
+    for (int round = 0; round < 2; round++) {
+        state = 5; /* the second round asks every question again */
+        for (int i = 0; i < 6000; i++) {
+            next_percept(&state, &p);
+            choice_t a = {GOAL_COUNT, MOOD_COUNT}, b = {GOAL_COUNT, MOOD_COUNT};
+            CHECK(model_choose(quick, &p, &a));
+            CHECK(model_choose(plain, &p, &b));
+            CHECK(a.goal == b.goal && a.mood == b.mood);
+            /* And again at once, as a fish whose situation has not changed does. */
+            choice_t again = {GOAL_COUNT, MOOD_COUNT};
+            CHECK(model_choose(quick, &p, &again));
+            CHECK(again.goal == b.goal && again.mood == b.mood);
+        }
+    }
+    CHECK(model_recalled(quick) >= 12000); /* it did answer from memory... */
+    CHECK(model_recalled(plain) == 0);  /* ...and the plain one never did */
+
+    /* A situation outside the schema is never remembered as an answer. */
+    next_percept(&state, &p);
+    choice_t c = {GOAL_HIDE, MOOD_SULKY};
+    CHECK(model_choose(quick, &p, &c));
+    p.stress = 10;
+    c = (choice_t){GOAL_HIDE, MOOD_SULKY};
+    CHECK(!model_choose(quick, &p, &c));
+    CHECK(!model_choose(quick, &p, &c));
+    CHECK(c.goal == GOAL_HIDE && c.mood == MOOD_SULKY);
+    p.stress = -1;
+    CHECK(!model_choose(quick, &p, &c));
+    p.stress = 0;
+    p.species = (species_t)SPECIES_COUNT;
+    CHECK(!model_choose(quick, &p, &c));
+
+    /* Switching memory off stops it being used; switching it on starts afresh. */
+    unsigned before = model_recalled(quick);
+    model_remember(quick, false);
+    state = 5;
+    for (int i = 0; i < 200; i++) {
+        next_percept(&state, &p);
+        model_choose(quick, &p, &c);
+    }
+    CHECK(model_recalled(quick) == before);
+
+    model_free(quick);
+    model_free(plain);
+}
+
+/* ---- Choosing where the model's numbers live --------------------------- */
+
+static int given, taken_back, refuse_after;
+
+static void *counting_alloc(size_t size)
+{
+    if (refuse_after == 0) {
+        return NULL;
+    }
+    if (refuse_after > 0) {
+        refuse_after--;
+    }
+    given++;
+    return malloc(size);
+}
+
+static void counting_release(void *p)
+{
+    if (p != NULL) {
+        taken_back++;
+    }
+    free(p);
+}
+
+static void test_memory_can_be_chosen(const uint8_t *data, size_t size)
+{
+    given = taken_back = 0;
+    refuse_after = -1; /* never refuse */
+    model_use_memory(counting_alloc, counting_release);
+    model_t *m = model_load(data, size);
+    CHECK(m != NULL);
+    CHECK(given > 0);
+    model_use_memory(NULL, NULL); /* back to the ordinary kind, while m is still alive */
+    percept_t p;
+    uint32_t state = 9;
+    next_percept(&state, &p);
+    choice_t c;
+    CHECK(model_choose(m, &p, &c));
+    model_free(m); /* must go back the way it came */
+    CHECK(taken_back == given);
+
+    /* Running out part-way: no model, and nothing left behind. */
+    for (int allowed = 0; allowed < 4; allowed++) {
+        given = taken_back = 0;
+        refuse_after = allowed;
+        model_use_memory(counting_alloc, counting_release);
+        model_t *none = model_load(data, size);
+        model_use_memory(NULL, NULL);
+        if (none != NULL) { /* it needed no more than `allowed` blocks */
+            model_free(none);
+        }
+        CHECK(taken_back == given);
+    }
+    refuse_after = -1;
+}
+
 void test_model(void)
 {
     size_t size = 0;
@@ -236,5 +378,7 @@ void test_model(void)
         test_same_seed_same_tank(m);
     }
     model_free(m);
+    test_remembered_answers_are_the_same(data, size);
+    test_memory_can_be_chosen(data, size);
     free(data);
 }

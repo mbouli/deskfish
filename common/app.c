@@ -189,3 +189,8 @@ void app_model_stats(unsigned *count, uint32_t *total_ms, uint32_t *longest_ms)
         *longest_ms = model_longest_ms;
     }
 }
+
+unsigned app_model_recalled(void)
+{
+    return model_recalled(model);
+}

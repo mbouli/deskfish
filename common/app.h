@@ -38,6 +38,8 @@ bool app_using_model(void);
 /* Decisions the model has made, the milliseconds they took in total, and the
  * longest one. Any pointer may be NULL. */
 void app_model_stats(unsigned *count, uint32_t *total_ms, uint32_t *longest_ms);
+/* How many of those decisions were answers it remembered, costing nothing. */
+unsigned app_model_recalled(void);
 
 /* For inspection. */
 const tank_t *app_tank(void);

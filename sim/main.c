@@ -406,7 +406,8 @@ int main(int argc, char **argv)
             uint32_t total_ms = 0;
             app_model_stats(&asked, &total_ms, NULL);
             if (app_using_model() && asked > 0) {
-                printf("  the model has decided %u times, %.2f ms each on average\n", asked, (double)total_ms / asked);
+                printf("  the model has decided %u times (%u from memory), %.2f ms each on average\n", asked,
+                       app_model_recalled(), (double)total_ms / asked);
             }
         }
 

@@ -14,6 +14,8 @@
 #define MAX_BLOCK 64
 #define STATE_WORDS 26
 #define PROMPT_TOKENS (1 + STATE_WORDS + 1) /* the start marker, the line, "->" */
+#define MEMORY_SLOTS 256                     /* a power of two */
+#define MEMORY_SHIFT 56                      /* 64 less the number of bits in a slot number */
 
 /* One block's learned numbers, in the order the file holds them. */
 typedef struct {
@@ -36,7 +38,27 @@ struct model {
     block_t blocks[MAX_LAYERS];
     /* Working space for one forward pass. */
     float *x, *qkv, *normed, *gathered, *hidden, *delta, *weights;
+    void (*release)(void *p); /* how to give this model's memory back */
+
+    /* Recent situations and the answers given, each situation packed into
+     * one number. A key of 0 is an empty slot. */
+    bool remembering;
+    unsigned recalled;
+    struct {
+        uint64_t key;
+        uint8_t goal, mood;
+    } memory[MEMORY_SLOTS];
 };
+
+/* Where the next model loaded keeps its numbers. */
+static void *(*alloc_fn)(size_t size);
+static void (*release_fn)(void *p);
+
+void model_use_memory(void *(*alloc)(size_t size), void (*release)(void *p))
+{
+    alloc_fn = alloc != NULL && release != NULL ? alloc : NULL;
+    release_fn = alloc_fn != NULL ? release : NULL;
+}
 
 /* ---- Reading the file -------------------------------------------------- */
 
@@ -115,9 +137,14 @@ void model_free(model_t *m)
     if (m == NULL) {
         return;
     }
-    free(m->numbers);
-    free(m->x);
-    free(m);
+    void (*release)(void *p) = m->release;
+    if (m->numbers != NULL) {
+        release(m->numbers);
+    }
+    if (m->x != NULL) {
+        release(m->x);
+    }
+    release(m);
 }
 
 size_t model_numbers(const model_t *m)
@@ -141,10 +168,14 @@ model_t *model_load(const uint8_t *data, size_t size)
         return NULL;
     }
 
-    model_t *m = calloc(1, sizeof(*m));
+    void *(*alloc)(size_t size) = alloc_fn != NULL ? alloc_fn : malloc;
+    model_t *m = alloc(sizeof(*m));
     if (m == NULL) {
         return NULL;
     }
+    memset(m, 0, sizeof(*m));
+    m->release = alloc_fn != NULL ? release_fn : free;
+    m->remembering = true;
     m->vocab = (int)vocab;
     m->block = (int)block;
     m->layers = (int)layers;
@@ -158,7 +189,7 @@ model_t *model_load(const uint8_t *data, size_t size)
             model_free(m);
             return NULL;
         }
-        memcpy(m->words[i], word, *length); /* calloc left the terminating zero */
+        memcpy(m->words[i], word, *length); /* the terminating zero is already there */
     }
 
     /* Every word the tank will need must be there. */
@@ -181,16 +212,16 @@ model_t *model_load(const uint8_t *data, size_t size)
     size_t e = embd, v = vocab, b = block;
     size_t per_block = 2 * e + (3 * e * e + 3 * e) + (e * e + e) + 2 * e + (4 * e * e + 4 * e) + (4 * e * e + e);
     m->count = v * e + b * e + layers * per_block + 2 * e + v * e;
-    m->numbers = malloc(m->count * sizeof(float));
-    /* x, qkv, normed, gathered, hidden, delta, weights: one allocation. */
-    size_t scratch = b * e + b * 3 * e + e + e + 4 * e + e + b;
-    m->x = malloc(scratch * sizeof(float));
+    m->numbers = alloc(m->count * sizeof(float));
+    /* x, qkv (kept for every block), normed, gathered, hidden, delta, weights: one allocation. */
+    size_t scratch = b * e + layers * b * 3 * e + e + e + 4 * e + e + b;
+    m->x = alloc(scratch * sizeof(float));
     if (m->numbers == NULL || m->x == NULL) {
         model_free(m);
         return NULL;
     }
     m->qkv = m->x + b * e;
-    m->normed = m->qkv + b * 3 * e;
+    m->normed = m->qkv + layers * b * 3 * e;
     m->gathered = m->normed + e;
     m->hidden = m->gathered + e;
     m->delta = m->hidden + 4 * e;
@@ -263,14 +294,20 @@ static float gelu(float x)
     return 0.5f * x * (1.0f + erff(x * 0.70710678f));
 }
 
-/* Run the tokens through the model; scores[v] is how strongly it expects word
- * v to come next. */
-static void forward(model_t *m, const int *tokens, int count, float *scores)
+/* Run tokens `from` up to `count` through the model, the ones before `from`
+ * having been through already; scores[v] is then how strongly it expects word
+ * v to come after the last one.
+ *
+ * Two things save most of the work. A token only ever looks back, so earlier
+ * tokens are unchanged by a new one: their keys and values are kept in m->qkv
+ * and only the new token is worked out. And only the last token is read at
+ * the end, so the last block finishes that one alone. */
+static void forward(model_t *m, const int *tokens, int from, int count, float *scores)
 {
     int e = m->embd, hw = e / m->heads;
     float inv_sqrt = 1.0f / sqrtf((float)hw);
 
-    for (int t = 0; t < count; t++) {
+    for (int t = from; t < count; t++) {
         const float *tok = m->tok_emb + (size_t)tokens[t] * (size_t)e;
         const float *pos = m->pos_emb + (size_t)t * (size_t)e;
         for (int i = 0; i < e; i++) {
@@ -280,19 +317,23 @@ static void forward(model_t *m, const int *tokens, int count, float *scores)
 
     for (int l = 0; l < m->layers; l++) {
         const block_t *k = &m->blocks[l];
+        float *qkv = m->qkv + (size_t)l * (size_t)m->block * 3 * (size_t)e;
+        /* Later blocks need every token this block finishes; nothing needs
+         * what the last block makes of any token but the last. */
+        int first = l == m->layers - 1 ? count - 1 : from;
 
-        /* Gather. Every token's query, key and value first... */
-        for (int t = 0; t < count; t++) {
+        /* Gather. Every new token's query, key and value first... */
+        for (int t = from; t < count; t++) {
             layer_norm(k->norm1_w, k->norm1_b, m->x + t * e, m->normed, e);
-            linear(k->qkv_w, k->qkv_b, m->normed, e, m->qkv + t * 3 * e, 3 * e);
+            linear(k->qkv_w, k->qkv_b, m->normed, e, qkv + t * 3 * e, 3 * e);
         }
-        /* ...then each token looks back over itself and everything before it. */
-        for (int t = 0; t < count; t++) {
+        /* ...then each looks back over itself and everything before it. */
+        for (int t = first; t < count; t++) {
             for (int h = 0; h < m->heads; h++) {
-                const float *q = m->qkv + t * 3 * e + h * hw;
+                const float *q = qkv + t * 3 * e + h * hw;
                 float best = -INFINITY, total = 0.0f;
                 for (int u = 0; u <= t; u++) {
-                    const float *key = m->qkv + u * 3 * e + e + h * hw;
+                    const float *key = qkv + u * 3 * e + e + h * hw;
                     float match = 0.0f;
                     for (int i = 0; i < hw; i++) {
                         match += q[i] * key[i];
@@ -309,7 +350,7 @@ static void forward(model_t *m, const int *tokens, int count, float *scores)
                 float *got = m->gathered + h * hw;
                 memset(got, 0, (size_t)hw * sizeof(float));
                 for (int u = 0; u <= t; u++) {
-                    const float *value = m->qkv + u * 3 * e + 2 * e + h * hw;
+                    const float *value = qkv + u * 3 * e + 2 * e + h * hw;
                     float share = m->weights[u] / total;
                     for (int i = 0; i < hw; i++) {
                         got[i] += share * value[i];
@@ -320,10 +361,8 @@ static void forward(model_t *m, const int *tokens, int count, float *scores)
             for (int i = 0; i < e; i++) {
                 m->x[t * e + i] += m->delta[i];
             }
-        }
 
-        /* Digest. */
-        for (int t = 0; t < count; t++) {
+            /* Digest. */
             layer_norm(k->norm2_w, k->norm2_b, m->x + t * e, m->normed, e);
             linear(k->up_w, k->up_b, m->normed, e, m->hidden, 4 * e);
             for (int i = 0; i < 4 * e; i++) {
@@ -351,13 +390,65 @@ static int best_of(const float *scores, const int *candidates, int count)
     return best;
 }
 
+/* ---- Remembering answers ----------------------------------------------- */
+
+/* Shift one field into the key. False if it is outside its range. */
+static bool pack(uint64_t *key, int value, int count, int bits)
+{
+    if (value < 0 || value >= count) {
+        return false;
+    }
+    *key = (*key << bits) | (uint64_t)value;
+    return true;
+}
+
+/* A situation as one number: every field, exactly, so two situations share a
+ * key only if they are the same. False if p is outside the schema. */
+static bool situation_key(const percept_t *p, uint64_t *key)
+{
+    *key = 1; /* so that no key is 0 */
+    return pack(key, (int)p->species, SPECIES_COUNT, 3) && pack(key, p->hunger, 10, 4) &&
+           pack(key, p->energy, 10, 4) && pack(key, p->stress, 10, 4) && pack(key, p->bold, 10, 4) &&
+           pack(key, p->social, 10, 4) && pack(key, p->night ? 1 : 0, 2, 1) &&
+           pack(key, p->startled ? 1 : 0, 2, 1) && pack(key, (int)p->current, GOAL_COUNT, 3) &&
+           pack(key, (int)p->food, 4, 2) && pack(key, (int)p->friend_, 4, 2) &&
+           pack(key, (int)p->finger, 4, 2) && pack(key, (int)p->cover, 4, 2);
+}
+
+void model_remember(model_t *m, bool on)
+{
+    if (m == NULL) {
+        return;
+    }
+    m->remembering = on;
+    memset(m->memory, 0, sizeof(m->memory));
+}
+
+unsigned model_recalled(const model_t *m)
+{
+    return m == NULL ? 0 : m->recalled;
+}
+
 bool model_choose(model_t *m, const percept_t *p, choice_t *out)
 {
     char line[PERCEPT_TEXT_MAX];
     int tokens[PROMPT_TOKENS + 1];
     float scores[MAX_VOCAB];
     int count = 0;
-    if (m == NULL || p == NULL || out == NULL || percept_encode(p, line, sizeof(line)) < 0) {
+    if (m == NULL || p == NULL || out == NULL) {
+        return false;
+    }
+    /* The same situation always gets the same answer, so look for it first. */
+    uint64_t key = 0;
+    bool keyed = m->remembering && situation_key(p, &key);
+    unsigned slot = (unsigned)((key * 0x9E3779B97F4A7C15ull) >> MEMORY_SHIFT);
+    if (keyed && m->memory[slot].key == key) {
+        out->goal = (goal_t)m->memory[slot].goal;
+        out->mood = (mood_t)m->memory[slot].mood;
+        m->recalled++;
+        return true;
+    }
+    if (percept_encode(p, line, sizeof(line)) < 0) {
         return false;
     }
     tokens[count++] = m->bos;
@@ -379,12 +470,17 @@ bool model_choose(model_t *m, const percept_t *p, choice_t *out)
     }
     tokens[count++] = m->sep;
 
-    forward(m, tokens, count, scores);
+    forward(m, tokens, 0, count, scores);
     int goal = best_of(scores, m->goal_tok, GOAL_COUNT);
     tokens[count++] = m->goal_tok[goal];
-    forward(m, tokens, count, scores);
+    forward(m, tokens, count - 1, count, scores); /* only the new word */
     int mood = best_of(scores, m->mood_tok, MOOD_COUNT);
 
+    if (keyed) {
+        m->memory[slot].key = key;
+        m->memory[slot].goal = (uint8_t)goal;
+        m->memory[slot].mood = (uint8_t)mood;
+    }
     out->goal = (goal_t)goal;
     out->mood = (mood_t)mood;
     return true;
