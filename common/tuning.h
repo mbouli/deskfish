@@ -23,47 +23,47 @@
 
 /* Where in the world the tank is */
 
-#define PLACE_LAT_DEG 32.61f  /* Auburn, Alabama. North is positive. */
-#define PLACE_LON_DEG (-85.48f) /* East is positive. */
+#define PLACE_LAT_DEG 32.61f
+#define PLACE_LON_DEG (-85.48f)
 
 /* Needs, 0..9 */
 
 #define NEED_MAX 9.0f
-#define HUNGER_VARIATION 0.2f         /* a fish's appetite is its species' rate, give or take this fraction */
+#define HUNGER_VARIATION 0.2f /* a fish's appetite is its species' rate, give or take this fraction */
 #define HUNGER_PER_PELLET 4.0f
 #define ENERGY_DRAIN_PER_TICK 0.0015f /* full to empty in 5 minutes of activity */
 #define ENERGY_NIGHT_FACTOR 3.0f
-#define ENERGY_REST_PER_TICK 0.01f    /* empty to full in 45 seconds of rest */
-#define STRESS_DECAY_PER_TICK 0.01f   /* 9 to 0 in 45 seconds */
-#define STRESS_SHY_PER_TICK 0.05f     /* a shy fish with a finger close by */
-#define SHY_BOLD_MAX 3                /* "shy" means bold at or below this */
+#define ENERGY_REST_PER_TICK 0.01f  /* empty to full in 45 seconds of rest */
+#define STRESS_DECAY_PER_TICK 0.01f /* 9 to 0 in 45 seconds */
+#define STRESS_SHY_PER_TICK 0.05f   /* a shy fish with a finger close by */
+#define SHY_BOLD_MAX 3              /* "shy" means bold at or below this */
 
 /* Seeing and deciding */
 
 #define DIST_NEAR_PX 48.0f
 #define DIST_MID_PX 120.0f
-#define DECIDE_TICKS 30               /* ask the brain every 1.5 seconds */
-#define DECIDE_STAGGER_TICKS 6        /* fish take turns */
-#define SIGN_TICKS 100                /* a mood sign shows for 5 seconds */
+#define DECIDE_TICKS 30        /* ask the brain every 1.5 seconds */
+#define DECIDE_STAGGER_TICKS 6 /* fish take turns */
+#define SIGN_TICKS 100         /* a mood sign shows for 5 seconds */
 
 /* The finger and food */
 
-#define TAP_MAX_TICKS 6               /* longer than 0.3 seconds is a hold */
+#define TAP_MAX_TICKS 6 /* longer than 0.3 seconds is a hold */
 #define TAP_MAX_MOVE_PX 10.0f
 #define STARTLE_PX 40.0f
 #define PELLET_SINK_SPEED 15.0f
 #define PELLET_FLOOR_Y 206.0f
-#define PELLET_LIFE_TICKS 600         /* 30 seconds on the sand */
+#define PELLET_LIFE_TICKS 600 /* 30 seconds on the sand */
 #define EAT_RADIUS_PX 10.0f
 
 /* Movement */
 
-#define STEER_GAIN 0.08f              /* fraction of the way to the wanted velocity, per tick */
-#define FACING_FLIP_SPEED 3.0f        /* sideways speed needed before the sprite turns round */
+#define STEER_GAIN 0.08f       /* fraction of the way to the wanted velocity, per tick */
+#define FACING_FLIP_SPEED 3.0f /* sideways speed needed before the sprite turns round */
 
 #define WANDER_SPEED 20.0f
-#define WANDER_ARRIVE_PX 8.0f         /* close enough: pick a new point */
-#define WANDER_MIN_TICKS 80           /* give up on a point after 4 to 12 seconds */
+#define WANDER_ARRIVE_PX 8.0f /* close enough: pick a new point */
+#define WANDER_MIN_TICKS 80   /* give up on a point after 4 to 12 seconds */
 #define WANDER_MAX_TICKS 240
 
 #define SEEK_SPEED 45.0f
@@ -76,7 +76,7 @@
 #define FLEE_GAIN 0.3f
 
 #define INVESTIGATE_SPEED 30.0f
-#define INVESTIGATE_GAP_PX 30.0f      /* how close a curious fish comes */
+#define INVESTIGATE_GAP_PX 30.0f /* how close a curious fish comes */
 #define CIRCLE_SPEED 15.0f
 
 #define HIDE_SPEED 50.0f
@@ -85,35 +85,35 @@
 #define SCHOOL_SPEED 28.0f
 #define SCHOOL_GAP_PX 30.0f
 #define SCHOOL_BAND_PX 10.0f
-#define SCHOOL_MIN_FRIEND_SPEED 5.0f  /* a friend slower than this is not worth following */
+#define SCHOOL_MIN_FRIEND_SPEED 5.0f /* a friend slower than this is not worth following */
 
 /* Moods: how a fish goes about its goal */
 
 #define EAGER_SPEED 1.3f
 #define EAGER_GAIN 1.5f
 #define WARY_SPEED 0.8f
-#define WARY_SPACE_PX 40.0f           /* a wary fish pushes off from others this far out */
+#define WARY_SPACE_PX 40.0f /* a wary fish pushes off from others this far out */
 #define PLAYFUL_BURST_SPEED 1.6f
 #define PLAYFUL_COAST_SPEED 0.9f
-#define PLAYFUL_PERIOD_TICKS 40       /* one burst every 2 seconds... */
-#define PLAYFUL_BURST_TICKS 12        /* ...lasting 0.6 seconds */
-#define PLAYFUL_WEAVE 0.5f            /* sideways swing, as a fraction of its speed */
+#define PLAYFUL_PERIOD_TICKS 40 /* one burst every 2 seconds... */
+#define PLAYFUL_BURST_TICKS 12  /* ...lasting 0.6 seconds */
+#define PLAYFUL_WEAVE 0.5f      /* sideways swing, as a fraction of its speed */
 #define PLAYFUL_WEAVE_TICKS 30
 #define SLEEPY_SPEED 0.6f
-#define SLEEPY_BOB_SPEED 4.0f         /* up-and-down drift, pixels per second */
+#define SLEEPY_BOB_SPEED 4.0f /* up-and-down drift, pixels per second */
 #define SLEEPY_BOB_TICKS 60
 #define SULKY_SPEED 0.7f
-#define SULKY_SPACE_PX 60.0f          /* a sulky fish keeps this far from the others */
+#define SULKY_SPACE_PX 60.0f /* a sulky fish keeps this far from the others */
 #define SULKY_PUSH 30.0f
 
 /* Depth: in front of or behind the rocks and kelp */
 
-#define FRONT_CHANCE 0.5f             /* how often a wandering fish picks the front layer */
-#define LAYER_CLEAR_HALF_PX 24.0f     /* open water needed around a fish before it changes layer */
-#define LAYER_FORCE_TICKS 20          /* a hiding fish stuck in front switches anyway after 1 second */
-#define LAYER_EASE 0.15f              /* how fast its drawn size follows the change, per tick */
-#define FISH_BACK_PX 28               /* drawn size behind the art... */
-#define FISH_FRONT_PX 32              /* ...and in front of it */
+#define FRONT_CHANCE 0.5f         /* how often a wandering fish picks the front layer */
+#define LAYER_CLEAR_HALF_PX 24.0f /* open water needed around a fish before it changes layer */
+#define LAYER_FORCE_TICKS 20      /* a hiding fish stuck in front switches anyway after 1 second */
+#define LAYER_EASE 0.15f          /* how fast its drawn size follows the change, per tick */
+#define FISH_BACK_PX 28           /* drawn size behind the art... */
+#define FISH_FRONT_PX 32          /* ...and in front of it */
 
-#define SEPARATION_PX 22.0f           /* closer than this, fish push apart */
+#define SEPARATION_PX 22.0f /* closer than this, fish push apart */
 #define SEPARATION_PUSH 45.0f

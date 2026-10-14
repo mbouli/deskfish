@@ -11,4 +11,6 @@ tests/tests
 firmware/main/secrets.h
 model/out/*.txt
 model/out/*.pt
+model/out/*.log
 __pycache__/
+flash.zsh

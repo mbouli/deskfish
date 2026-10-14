@@ -9,7 +9,7 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
 FISH_DIR = ROOT / "assets" / "fish"
-BG_DIR = ROOT / "assets" / "bg_inspo" / "03"
+BG_DIR = ROOT / "assets" / "bg"
 OUT = ROOT / "common" / "assets_data.c"
 
 SCREEN_W = 320
