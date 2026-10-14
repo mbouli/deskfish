@@ -5,7 +5,10 @@ each fish decides what to do next by asking a tiny language model that runs on
 the board itself. No cloud, no phone app. Five fish, a tank, and a sky that matches
 the real one outside.
 
-![The tank at sunset](docs/images/dusk.png)
+![A day in the tank, sped up](docs/images/timelapse.gif)
+
+That's a full day in 24 seconds, recorded from the desktop simulator with the
+sky time-lapse on. The fish are moving at normal speed. Only the sky is sped up.
 
 I built this to learn how small language models get made: you take a big model
 (the teacher), have it answer thousands of questions in character, and train a
@@ -224,6 +227,8 @@ and fish. `common/scene.c` then paints lit copies of all the art into memory.
 Lighting the art is slow on this chip (one re-light takes longer than a whole
 normal frame), so the lit copies are only rebuilt when the minute changes, and
 frames are drawn straight from them.
+
+![The tank at sunset](docs/images/dusk.png)
 
 ## What's where
 
