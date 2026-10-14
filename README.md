@@ -1,51 +1,31 @@
 # deskfish
 
-A fish tank for my desk. It runs on a small ESP32-S3 touchscreen board, and
-each fish decides what to do next by asking a tiny language model that runs on
-the board itself. No cloud, no phone app. Five fish, a tank, and a sky that matches
-the real one outside.
+A fish tank for my desk. It runs on an ESP32-S3 touchscreen board, and each
+fish decides what to do by asking a tiny language model that runs on the board.
 
 ![A day in the tank, sped up](docs/images/timelapse.gif)
 
-That's a full day in 24 seconds, recorded from the desktop simulator with the
-sky time-lapse on. The fish are moving at normal speed. Only the sky is sped up.
+A full day in 24 seconds, from the simulator. Only the sky is sped up.
 
-I built this to learn how small language models get made: you take a big model
-(the teacher), have it answer thousands of questions in character, and train a
-very small model (the student) to copy it. The student here is about 30,000
-numbers and fits in 30 KB. It was inspired by
-[pocket-tank](https://github.com/mediacutlet/pocket-tank), which does the same
-kind of thing on a different board with a much bigger model. I wrote this one
-from scratch, including the transformer.
+- Tap to drop food. Hold your finger down and bold fish come over while shy
+  ones hide.
+- Each species has its own personality, and a sign pops up over a fish's head
+  when its mood changes.
+- The sky is the real one over Auburn, Alabama: sun, moon phase and stars. The
+  fish sleep at night.
 
-## What you get
-
-Tap the screen and a food pellet drops. Hold your finger down and the fish
-notice it: bold ones come over and circle, shy ones bolt and hide behind the
-rocks. They get hungry, tired and stressed over time. When a fish's mood
-changes, a little sign pops up over its head for five seconds (a lightning bolt
-for eager, a rain cloud for sulky, and so on).
-
-Each species has a personality. The clownfish is nosy and fearless. The
-pufferfish is scared of everything and sulks afterwards. The catfish mostly
-can't be bothered. None of that is hard-coded: it comes from how the teacher
-model played each character, and the student picked it up.
-
-The background is the actual sky over Auburn, Alabama. The sun rises and sets
-at the right time for the date, the moon has the right phase, and stars come
-out once it's properly dark. The fish settle down for the night.
-
-![The tank at night](docs/images/night.png)
+The model is about 30,000 numbers (30 KB). A bigger model played each fish in
+character, and the small one was trained to copy it. I wrote it from scratch to
+learn how that works. Inspired by
+[pocket-tank](https://github.com/mediacutlet/pocket-tank).
 
 ## Hardware
 
-A Hosyond / LCDWIKI ES3C28P. That's an ESP32-S3 with a 2.8" 320x240 ILI9341V
-screen over SPI, an FT6336G capacitive touch panel over I2C, 16 MB of flash and
-8 MB of PSRAM. Pins are in `firmware/main/board.h` if you want to try another
-board.
+A Hosyond / LCDWIKI ES3C28P: an ESP32-S3 with a 2.8" 320x240 screen (ILI9341V),
+capacitive touch (FT6336G), 16 MB of flash and 8 MB of PSRAM. Pins are in
+`firmware/main/board.h`.
 
-You don't need the board to play with it. There's a simulator that runs the
-exact same code in a window on your computer.
+You don't need the board. The simulator runs the same code in a window.
 
 ## Try it in the simulator
 
