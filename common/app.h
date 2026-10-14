@@ -8,8 +8,6 @@
 #include "sky.h"
 #include "tank.h"
 
-/* The per-frame loop body shared by the simulator and the board. */
-
 /* Start, or restart, with a fresh tank. False if memory ran out. */
 bool app_init(uint32_t seed);
 
@@ -41,7 +39,6 @@ void app_model_stats(unsigned *count, uint32_t *total_ms, uint32_t *longest_ms);
 /* How many of those decisions were answers it remembered, costing nothing. */
 unsigned app_model_recalled(void);
 
-/* For inspection. */
 const tank_t *app_tank(void);
 const sky_t *app_sky(void);
 const light_t *app_light(void);

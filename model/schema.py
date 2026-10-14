@@ -40,8 +40,8 @@ ALLOWED = {
     "cover": DISTS,
 }
 
-BOS = "<s>"       # start of an example
-EOS = "</s>"      # end of an example
+BOS = "<s>"
+EOS = "</s>"
 SEPARATOR = "->"  # between the situation and the answer
 
 STATE_WORDS = 2 * len(FIELDS)                 # 26

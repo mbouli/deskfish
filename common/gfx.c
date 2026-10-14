@@ -75,7 +75,6 @@ void gfx_blit_fit(uint16_t *fb, const image_t *img, int x, int y, int out_w, int
     int x1 = x + out_w > DISPLAY_W ? DISPLAY_W : x + out_w;
     int y1 = y + out_h > DISPLAY_H ? DISPLAY_H : y + out_h;
     for (int row = y0; row < y1; row++) {
-        /* Which source row and column each screen pixel falls in. */
         const uint16_t *src = &img->px[((row - y) * img->h / out_h) * img->w];
         uint16_t *dst = &fb[row * DISPLAY_W];
         for (int col = x0; col < x1; col++) {

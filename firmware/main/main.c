@@ -82,7 +82,7 @@ void app_main(void)
         uint32_t frame_ms = clock_millis() - before;
         if (app_relights() != seen_relights) {
             seen_relights = app_relights();
-            relight_ms = frame_ms; /* this frame included a re-light */
+            relight_ms = frame_ms;
         }
 
         frames++;
@@ -101,7 +101,7 @@ void app_main(void)
             seen_decision_ms = decision_ms;
             ESP_LOGI(TAG, "%d fps; last re-light frame took %" PRIu32 " ms; clock from %s", frames / 5,
                      relight_ms, wifi_time_synced() ? "the internet" : "the build time");
-            unsigned worked = made - recalled; /* the ones it had to work out */
+            unsigned worked = made - recalled;
             ESP_LOGI(TAG, "model: %u decisions in 5 s, %u from memory; %" PRIu32 " ms in all (%" PRIu32
                           " ms for each worked out), longest ever %" PRIu32 " ms",
                      made, recalled, spent, worked ? spent / worked : 0, longest_ms);

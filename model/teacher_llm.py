@@ -26,7 +26,7 @@ class OllamaTeacher:
         body = {
             "model": self.model,
             "messages": messages,
-            "format": answer_format,   # the reply must have exactly this shape
+            "format": answer_format,
             "think": False,            # with thinking on, one answer takes minutes
             "stream": False,
             "options": {"temperature": self.temperature, "seed": self.seed},

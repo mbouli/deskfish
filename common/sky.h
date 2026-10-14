@@ -3,8 +3,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-/* Astronomy: where the sun is and what the moon looks like. No hardware. */
-
 typedef struct {
     float lat_deg; /* north is positive */
     float lon_deg; /* east is positive */

@@ -46,8 +46,6 @@ static void draw_fish_layer(const tank_t *t, bool front, uint16_t *fb)
     }
 }
 
-/* ---- Mood signs -------------------------------------------------------- */
-
 #define SIGN_OUTLINE RGB565(20, 28, 60)
 
 /* A sign is seven rows of seven characters: '.' is empty, and 'a' to 'd' pick
@@ -202,7 +200,6 @@ void render_sign_place(species_t s, int cx, int cy, bool facing_left, int size_p
 
 void render_tank(const tank_t *t, uint16_t *fb)
 {
-    /* Back fish, then the rocks and kelp, then front fish. */
     render_background(fb);
     draw_fish_layer(t, false, fb);
     render_foreground(fb);

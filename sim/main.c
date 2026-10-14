@@ -111,7 +111,6 @@ static void print_sky(int64_t unix_utc, const sky_t *sky, const light_t *light)
            light->star_count, light->fish_night ? ", fish night" : "");
 }
 
-/* One line per fish: what it is doing, how it feels, and what it sees. */
 static void print_fish(const tank_t *tank)
 {
     for (int i = 0; i < TANK_FISH; i++) {
@@ -126,7 +125,6 @@ static void print_fish(const tank_t *tank)
     }
 }
 
-/* Run with no window and print where everything ended up. */
 static int run_headless(uint32_t seed, long ticks, int64_t unix_utc, const char *snapshot, uint16_t *fb,
                         const uint8_t *model_data, size_t model_size)
 {
@@ -173,8 +171,8 @@ static bool parse_at(const char *text, int64_t *out)
     return true;
 }
 
-/* ---- Traces: play tanks with a fake finger and write down every situation
- * a fish's brain is asked about, with what the rules answered. ------------ */
+/* Traces: play tanks with a fake finger and write down every situation a
+ * fish's brain is asked about, with what the rules answered. */
 
 static FILE *trace_out;
 static long trace_lines;

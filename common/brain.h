@@ -27,18 +27,16 @@ typedef enum {
     MOOD_COUNT
 } mood_t;
 
-/* A brain's whole answer. */
 typedef struct {
     goal_t goal;
     mood_t mood;
 } choice_t;
 
-/* How far away something is, roughly. */
 typedef enum { DIST_NONE, DIST_NEAR, DIST_MID, DIST_FAR } dist_t;
 
 /* Everything the brain is allowed to know about one fish's situation. */
 typedef struct {
-    species_t species;          /* which fish this is */
+    species_t species;
     int hunger, energy, stress; /* 0..9 */
     int bold, social;           /* 0..9 */
     bool night;

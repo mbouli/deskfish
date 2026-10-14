@@ -4,7 +4,7 @@
  * Distances are screen pixels, speeds are pixels per second, and "per tick"
  * means per 1/20 second. */
 
-/* --- Where fish can be -------------------------------------------------- */
+/* Where fish can be */
 
 /* Where a fish's centre may be. Fish are 32 pixels wide, so this keeps the
  * whole sprite on screen sideways. */
@@ -21,24 +21,24 @@
 #define DEPTH_BOTTOM_MIN 150.0f
 #define DEPTH_BOTTOM_MAX 200.0f
 
-/* --- Where in the world the tank is ------------------------------------- */
+/* Where in the world the tank is */
 
 #define PLACE_LAT_DEG 32.61f  /* Auburn, Alabama. North is positive. */
 #define PLACE_LON_DEG (-85.48f) /* East is positive. */
 
-/* --- Needs, 0..9 -------------------------------------------------------- */
+/* Needs, 0..9 */
 
 #define NEED_MAX 9.0f
 #define HUNGER_VARIATION 0.2f         /* a fish's appetite is its species' rate, give or take this fraction */
 #define HUNGER_PER_PELLET 4.0f
 #define ENERGY_DRAIN_PER_TICK 0.0015f /* full to empty in 5 minutes of activity */
-#define ENERGY_NIGHT_FACTOR 3.0f      /* activity costs this much more at night */
+#define ENERGY_NIGHT_FACTOR 3.0f
 #define ENERGY_REST_PER_TICK 0.01f    /* empty to full in 45 seconds of rest */
 #define STRESS_DECAY_PER_TICK 0.01f   /* 9 to 0 in 45 seconds */
 #define STRESS_SHY_PER_TICK 0.05f     /* a shy fish with a finger close by */
 #define SHY_BOLD_MAX 3                /* "shy" means bold at or below this */
 
-/* --- Seeing and deciding ------------------------------------------------ */
+/* Seeing and deciding */
 
 #define DIST_NEAR_PX 48.0f
 #define DIST_MID_PX 120.0f
@@ -46,17 +46,17 @@
 #define DECIDE_STAGGER_TICKS 6        /* fish take turns */
 #define SIGN_TICKS 100                /* a mood sign shows for 5 seconds */
 
-/* --- The finger and food ------------------------------------------------ */
+/* The finger and food */
 
 #define TAP_MAX_TICKS 6               /* longer than 0.3 seconds is a hold */
 #define TAP_MAX_MOVE_PX 10.0f
 #define STARTLE_PX 40.0f
 #define PELLET_SINK_SPEED 15.0f
-#define PELLET_FLOOR_Y 206.0f         /* where pellets come to rest */
+#define PELLET_FLOOR_Y 206.0f
 #define PELLET_LIFE_TICKS 600         /* 30 seconds on the sand */
 #define EAT_RADIUS_PX 10.0f
 
-/* --- Movement ----------------------------------------------------------- */
+/* Movement */
 
 #define STEER_GAIN 0.08f              /* fraction of the way to the wanted velocity, per tick */
 #define FACING_FLIP_SPEED 3.0f        /* sideways speed needed before the sprite turns round */
@@ -73,7 +73,7 @@
 #define REST_ARRIVE_PX 4.0f
 
 #define FLEE_SPEED 90.0f
-#define FLEE_GAIN 0.3f                /* fleeing fish turn hard */
+#define FLEE_GAIN 0.3f
 
 #define INVESTIGATE_SPEED 30.0f
 #define INVESTIGATE_GAP_PX 30.0f      /* how close a curious fish comes */
@@ -83,14 +83,14 @@
 #define HIDE_ARRIVE_PX 3.0f
 
 #define SCHOOL_SPEED 28.0f
-#define SCHOOL_GAP_PX 30.0f           /* the distance schooling fish keep */
+#define SCHOOL_GAP_PX 30.0f
 #define SCHOOL_BAND_PX 10.0f
 #define SCHOOL_MIN_FRIEND_SPEED 5.0f  /* a friend slower than this is not worth following */
 
-/* --- Moods: how a fish goes about its goal ------------------------------ */
+/* Moods: how a fish goes about its goal */
 
 #define EAGER_SPEED 1.3f
-#define EAGER_GAIN 1.5f               /* turns harder */
+#define EAGER_GAIN 1.5f
 #define WARY_SPEED 0.8f
 #define WARY_SPACE_PX 40.0f           /* a wary fish pushes off from others this far out */
 #define PLAYFUL_BURST_SPEED 1.6f
@@ -106,7 +106,7 @@
 #define SULKY_SPACE_PX 60.0f          /* a sulky fish keeps this far from the others */
 #define SULKY_PUSH 30.0f
 
-/* --- Depth: in front of or behind the rocks and kelp --------------------- */
+/* Depth: in front of or behind the rocks and kelp */
 
 #define FRONT_CHANCE 0.5f             /* how often a wandering fish picks the front layer */
 #define LAYER_CLEAR_HALF_PX 24.0f     /* open water needed around a fish before it changes layer */

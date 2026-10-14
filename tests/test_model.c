@@ -219,8 +219,6 @@ static void test_same_seed_same_tank(model_t *m)
     CHECK(some_mood); /* the model's moods did reach the fish */
 }
 
-/* ---- Remembering answers ----------------------------------------------- */
-
 /* A stream of situations with plenty of repeats and near-repeats. */
 static void next_percept(uint32_t *state, percept_t *p)
 {
@@ -304,8 +302,6 @@ static void test_remembered_answers_are_the_same(const uint8_t *data, size_t siz
     model_free(quick);
     model_free(plain);
 }
-
-/* ---- Choosing where the model's numbers live --------------------------- */
 
 static int given, taken_back, refuse_after;
 

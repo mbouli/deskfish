@@ -5,8 +5,6 @@
 
 #include "sky.h"
 
-/* Turns a sky into what to draw. No hardware and no pictures. */
-
 #define LIGHT_BANDS 8      /* flat bands of sky colour around the sun */
 #define LIGHT_HALOS 3      /* rings around the moon */
 #define LIGHT_MAX_STARS 46

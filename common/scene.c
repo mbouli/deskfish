@@ -108,9 +108,7 @@ static uint16_t tint(uint16_t colour, const float t[3])
     return out == GFX_KEY ? (uint16_t)(GFX_KEY - 1) : out;
 }
 
-/* ---- The sky's bands ----------------------------------------------------
- *
- * The rule: a pixel is in the first band i for which
+/* The rule for the sky's bands: a pixel is in the first band i for which
  *     dx*dx + dy2 < T*T,   T = band_radius[i] - wobble[row][i]
  * where dy2 is the squared vertical distance from the bands' centre, stretched
  * by SQUASH and rounded to a whole number. Everything is whole numbers, so the

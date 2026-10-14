@@ -28,9 +28,9 @@ static void test_flee(void)
     percept_t p = calm();
     p.finger = DIST_NEAR;
     p.bold = 3;
-    CHECK(brain_choose(&p).goal == GOAL_FLEE); /* shy and close */
+    CHECK(brain_choose(&p).goal == GOAL_FLEE);
     p.bold = 4;
-    CHECK(brain_choose(&p).goal != GOAL_FLEE); /* not shy enough */
+    CHECK(brain_choose(&p).goal != GOAL_FLEE);
     p.bold = 9;
     p.startled = true;
     CHECK(brain_choose(&p).goal == GOAL_FLEE); /* even a bold fish jumps when startled */

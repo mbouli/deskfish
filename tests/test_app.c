@@ -106,7 +106,7 @@ static void test_touch_reaches_the_tank(void)
     for (int i = 0; i < TANK_PELLETS; i++) {
         pellets += app_tank()->pellets[i].alive;
     }
-    CHECK(pellets == 1); /* that was a tap */
+    CHECK(pellets == 1);
 }
 
 /* The sky clock's offset deliberately survives a restart, so each test here
@@ -143,7 +143,7 @@ static void test_relight_only_on_a_new_minute(void)
     sync_sky();
     ticks_after(50);
     unsigned first = app_relights();
-    CHECK(first >= 1);         /* once at the start */
+    CHECK(first >= 1);
     for (int i = 0; i < 20; i++) {
         stub_unix += 2;        /* 40 seconds pass */
         ticks_after(50);
@@ -223,7 +223,7 @@ static void test_app_model(void)
         app_frame(fb);
     }
     app_model_stats(&after, NULL, NULL);
-    CHECK(after > before);           /* the model was asked */
+    CHECK(after > before);
 
     app_use_rules(true);
     CHECK(!app_using_model());
@@ -234,7 +234,7 @@ static void test_app_model(void)
         app_frame(fb);
     }
     app_model_stats(&later, NULL, NULL);
-    CHECK(later == frozen);          /* the rules were asked instead */
+    CHECK(later == frozen);
     app_use_rules(false);
     CHECK(app_using_model());
     app_use_rules(true);             /* leave the app as other tests expect */

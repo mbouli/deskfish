@@ -25,13 +25,11 @@ static sky_t sky;
 static light_t light;
 static unsigned relights;
 
-/* The model, once one has been loaded, and what asking it has cost. */
 static model_t *model;
 static bool use_rules;
 static unsigned model_count;
 static uint32_t model_total_ms, model_longest_ms;
 
-/* The model, in the shape the tank expects of a brain. */
 static choice_t model_brain(const percept_t *p)
 {
     choice_t c = {GOAL_COUNT, MOOD_COUNT}; /* unusable unless the model answers: the tank then changes nothing */

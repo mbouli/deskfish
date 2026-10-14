@@ -27,10 +27,7 @@ typedef struct {
     float gain;
 } steer_t;
 
-/* ---- Small helpers ----------------------------------------------------- */
-
-/* xorshift32: a tiny generator that turns one number into the next. It must
- * never be given 0, which it would repeat forever. */
+/* xorshift32. The state must never be 0, which it would repeat forever. */
 static uint32_t rng_next(tank_t *t)
 {
     uint32_t x = t->rng;
@@ -67,8 +64,6 @@ static float distance(float ax, float ay, float bx, float by)
     float dx = ax - bx, dy = ay - by;
     return sqrtf(dx * dx + dy * dy);
 }
-
-/* ---- Looking around ---------------------------------------------------- */
 
 static dist_t bucket(float d)
 {
@@ -163,8 +158,6 @@ void tank_percept(const tank_t *t, int fish, percept_t *out)
     out->cover = seen[SEE_COVER];
 }
 
-/* ---- Setting up -------------------------------------------------------- */
-
 static void depth_band(depth_t depth, float *lo, float *hi)
 {
     switch (depth) {
@@ -191,7 +184,7 @@ static void pick_wander_target(tank_t *t, fish_t *f)
     f->tx = rng_range(t, SWIM_X_MIN, SWIM_X_MAX);
     f->ty = rng_range(t, lo, hi);
     f->target_ticks = rng_int(t, WANDER_MIN_TICKS, WANDER_MAX_TICKS);
-    f->want_front = rng_range(t, 0.0f, 1.0f) < FRONT_CHANCE; /* and maybe a change of depth */
+    f->want_front = rng_range(t, 0.0f, 1.0f) < FRONT_CHANCE;
 }
 
 void tank_init_cast(tank_t *t, uint32_t seed, const species_t cast[TANK_FISH])
@@ -224,7 +217,7 @@ void tank_init_cast(tank_t *t, uint32_t seed, const species_t cast[TANK_FISH])
         f->energy = rng_range(t, 6.0f, 9.0f);
         f->stress = 0.0f;
         f->goal = GOAL_WANDER;
-        f->decide_ticks = 1 + i * DECIDE_STAGGER_TICKS; /* fish take turns */
+        f->decide_ticks = 1 + i * DECIDE_STAGGER_TICKS;
         pick_wander_target(t, f);
         f->front = f->want_front; /* starts on its chosen layer, at that layer's size */
         f->depth = f->front ? 1.0f : 0.0f;
@@ -243,8 +236,6 @@ void tank_set_brain(tank_t *t, brain_fn fn)
 {
     t->choose = fn != NULL ? fn : brain_choose;
 }
-
-/* ---- The finger -------------------------------------------------------- */
 
 void tank_set_finger(tank_t *t, bool down, int x, int y)
 {
@@ -362,8 +353,6 @@ static void update_pellets(tank_t *t)
     }
 }
 
-/* ---- Needs and decisions ----------------------------------------------- */
-
 static void update_needs(tank_t *t, fish_t *f)
 {
     f->hunger += f->hunger_per_tick;
@@ -418,8 +407,6 @@ static void maybe_decide(tank_t *t, int i)
     }
     f->startled = false;
 }
-
-/* ---- Bodies: one per goal ---------------------------------------------- */
 
 /* Head for a point at a speed; stop once within `arrive` of it. Returns true
  * once it has arrived. */
@@ -533,7 +520,7 @@ static bool body_school(tank_t *t, int self, steer_t *s)
     }
     const fish_t *friend_ = &t->fish[i];
     if (d > SCHOOL_GAP_PX + SCHOOL_BAND_PX) {
-        steer_to(f, friend_->x, friend_->y, SCHOOL_SPEED, 0.0f, s); /* catch up */
+        steer_to(f, friend_->x, friend_->y, SCHOOL_SPEED, 0.0f, s);
         return true;
     }
     /* Close enough: go where the friend is going. A friend that is barely
@@ -694,8 +681,6 @@ static void move(fish_t *f, const steer_t *s)
     }
 }
 
-/* ---- Depth ------------------------------------------------------------- */
-
 /* True if there is no foreground art within `half` pixels of (x, y). */
 static bool water_is_clear(float x, float y, float half)
 {
@@ -744,8 +729,6 @@ static void maybe_eat(tank_t *t, fish_t *f)
         f->hunger = clampf(f->hunger - HUNGER_PER_PELLET, 0.0f, NEED_MAX);
     }
 }
-
-/* ---- One tick ---------------------------------------------------------- */
 
 void tank_tick(tank_t *t, bool night)
 {

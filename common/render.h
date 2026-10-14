@@ -26,5 +26,4 @@ void render_sign_place(species_t s, int cx, int cy, bool facing_left, int size_p
 /* Draw a mood's sign with its top-left pixel at (x, y). Calm has none. */
 void render_sign(uint16_t *fb, mood_t mood, int x, int y);
 
-/* Draw the whole tank. */
 void render_tank(const tank_t *t, uint16_t *fb);

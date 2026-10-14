@@ -98,7 +98,6 @@ void light_compute(const sky_t *sky, light_t *out)
 {
     float alt = sky->sun_alt_deg;
 
-    /* Which two keyframes are we between, and how far along? */
     int hi = 1;
     while (hi < KEY_COUNT - 1 && alt > KEYS[hi].alt) {
         hi++;

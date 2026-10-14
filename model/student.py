@@ -1,7 +1,7 @@
 """The student: a small decoder-only transformer, written from scratch.
 
 It reads a line of tokens and, for every position, scores each word in the
-vocabulary as the next one. That is all a language model is.
+vocabulary as the next one.
 """
 import math
 from dataclasses import asdict, dataclass
@@ -17,9 +17,9 @@ import schema
 class Config:
     vocab_size: int = 54
     block_size: int = 32  # the longest line it can hold; an example is 31 tokens
-    n_layer: int = 2      # how many blocks are stacked
-    n_head: int = 2       # how many separate lookups each attention does
-    n_embd: int = 32      # how many numbers describe each token
+    n_layer: int = 2
+    n_head: int = 2
+    n_embd: int = 32
 
 
 # The sizes compared. Each is roughly four times the one before.
@@ -59,10 +59,10 @@ class SelfAttention(nn.Module):
         k = k.view(batch, time, self.n_head, head_width).transpose(1, 2)
         v = v.view(batch, time, self.n_head, head_width).transpose(1, 2)
 
-        match = (q @ k.transpose(-2, -1)) / math.sqrt(head_width)       # every query against every key
+        match = (q @ k.transpose(-2, -1)) / math.sqrt(head_width)
         match = match.masked_fill(self.allowed[:, :, :time, :time] == 0, float("-inf"))  # no looking ahead
-        weights = F.softmax(match, dim=-1)                               # shares that add up to 1
-        gathered = weights @ v                                           # a blend of the values
+        weights = F.softmax(match, dim=-1)
+        gathered = weights @ v
         gathered = gathered.transpose(1, 2).contiguous().view(batch, time, width)
         return self.out(gathered)
 
@@ -82,7 +82,6 @@ class Block(nn.Module):
         )
 
     def forward(self, x):
-        # Each step adds to what was there, so information can pass straight through.
         x = x + self.attention(self.norm1(x))
         x = x + self.digest(self.norm2(x))
         return x
@@ -94,11 +93,11 @@ class Student(nn.Module):
         if config.n_embd % config.n_head != 0:
             raise ValueError(f"n_embd ({config.n_embd}) must divide evenly among n_head ({config.n_head})")
         self.config = config
-        self.token_embedding = nn.Embedding(config.vocab_size, config.n_embd)     # what each word is
-        self.position_embedding = nn.Embedding(config.block_size, config.n_embd)  # where each word sits
+        self.token_embedding = nn.Embedding(config.vocab_size, config.n_embd)
+        self.position_embedding = nn.Embedding(config.block_size, config.n_embd)
         self.blocks = nn.ModuleList(Block(config) for _ in range(config.n_layer))
         self.norm = nn.LayerNorm(config.n_embd)
-        self.to_vocab = nn.Linear(config.n_embd, config.vocab_size, bias=False)   # a score for every word
+        self.to_vocab = nn.Linear(config.n_embd, config.vocab_size, bias=False)
 
     def forward(self, tokens):
         """tokens: (batch, time) of token numbers -> (batch, time, vocab) scores for the next token."""

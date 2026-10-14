@@ -32,7 +32,7 @@ struct model {
     char words[MAX_VOCAB][MAX_WORD + 1];
     int bos, sep;
     int goal_tok[GOAL_COUNT], mood_tok[MOOD_COUNT];
-    size_t count;   /* how many learned numbers */
+    size_t count;
     float *numbers; /* all of them, in one allocation */
     const float *tok_emb, *pos_emb, *norm_w, *norm_b, *to_vocab;
     block_t blocks[MAX_LAYERS];
@@ -59,8 +59,6 @@ void model_use_memory(void *(*alloc)(size_t size), void (*release)(void *p))
     alloc_fn = alloc != NULL && release != NULL ? alloc : NULL;
     release_fn = alloc_fn != NULL ? release : NULL;
 }
-
-/* ---- Reading the file -------------------------------------------------- */
 
 typedef struct {
     const uint8_t *data;
@@ -256,8 +254,6 @@ model_t *model_load(const uint8_t *data, size_t size)
     return m;
 }
 
-/* ---- The arithmetic ---------------------------------------------------- */
-
 /* out = w x in + b, where w has n_out rows of n_in numbers. b may be NULL. */
 static void linear(const float *w, const float *b, const float *in, int n_in, float *out, int n_out)
 {
@@ -271,8 +267,6 @@ static void linear(const float *w, const float *b, const float *in, int n_in, fl
     }
 }
 
-/* Shift and scale a row of numbers to mean 0 and spread 1, then apply the
- * learned scale and shift. */
 static void layer_norm(const float *w, const float *b, const float *in, float *out, int n)
 {
     float mean = 0.0f, var = 0.0f;
@@ -343,7 +337,7 @@ static void forward(model_t *m, const int *tokens, int from, int count, float *s
                         best = m->weights[u];
                     }
                 }
-                for (int u = 0; u <= t; u++) { /* softmax: shares that add up to 1 */
+                for (int u = 0; u <= t; u++) {
                     m->weights[u] = expf(m->weights[u] - best);
                     total += m->weights[u];
                 }
@@ -389,8 +383,6 @@ static int best_of(const float *scores, const int *candidates, int count)
     }
     return best;
 }
-
-/* ---- Remembering answers ----------------------------------------------- */
 
 /* Shift one field into the key. False if it is outside its range. */
 static bool pack(uint64_t *key, int value, int count, int bits)

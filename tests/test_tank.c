@@ -7,8 +7,6 @@
 #include "test.h"
 #include "tuning.h"
 
-/* ---- Carried over from Part 1 ----------------------------------------- */
-
 static void test_cast(void)
 {
     static const species_t cast[TANK_FISH] = {SPECIES_CLOWNFISH, SPECIES_GOLDFISH, SPECIES_PUFFERFISH,
@@ -153,8 +151,6 @@ static void test_no_facing_flicker(void)
     }
 }
 
-/* ---- Needs ------------------------------------------------------------- */
-
 static void test_needs_move_the_right_way(void)
 {
     tank_t t;
@@ -229,8 +225,6 @@ static void test_appetite_depends_on_species(void)
     CHECK(goldfish->hunger > catfish->hunger * 10.0f);
 }
 
-/* ---- Day and night ----------------------------------------------------- */
-
 static void test_night_flag(void)
 {
     tank_t t;
@@ -240,8 +234,6 @@ static void test_night_flag(void)
     tank_tick(&t, DAY);
     CHECK(!t.night);
 }
-
-/* ---- Taps and pellets -------------------------------------------------- */
 
 static void test_tap_drops_one_pellet(void)
 {
@@ -356,8 +348,6 @@ static void test_pellets_sink_settle_and_expire(void)
     CHECK(pellet_count(&t) == 0);
 }
 
-/* ---- Eating ------------------------------------------------------------ */
-
 static void test_hungry_fish_reaches_food_and_eats(void)
 {
     tank_t t;
@@ -427,8 +417,6 @@ static void test_rest_is_low_and_slow(void)
         CHECK(hypotf(t.fish[f].vx, t.fish[f].vy) < 2.0f);
     }
 }
-
-/* ---- Percepts ---------------------------------------------------------- */
 
 static void test_percept(void)
 {
@@ -500,8 +488,6 @@ static void test_finger_is_seen_while_down(void)
     tank_percept(&t, 0, &p);
     CHECK(p.finger == DIST_NONE);
 }
-
-/* ---- Decisions --------------------------------------------------------- */
 
 static int calls, calls_seeing_food;
 

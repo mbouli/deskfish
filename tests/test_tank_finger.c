@@ -10,8 +10,6 @@ static float finger_distance(const tank_t *t, int f)
     return hypotf(t->fish[f].x - t->touch_x, t->fish[f].y - t->touch_y);
 }
 
-/* ---- Startle ----------------------------------------------------------- */
-
 static int startled_calls;
 
 static choice_t notice_startle(const percept_t *p)
@@ -82,8 +80,6 @@ static void test_shy_fish_get_stressed_near_a_finger(void)
     CHECK(t.fish[1].stress == 0.0f); /* the bold one does not care */
 }
 
-/* ---- Flee -------------------------------------------------------------- */
-
 static void test_flee(void)
 {
     tank_t t;
@@ -130,8 +126,6 @@ static void test_flee_without_a_finger_is_wander(void)
     }
 }
 
-/* ---- Investigate ------------------------------------------------------- */
-
 static void test_investigate(void)
 {
     tank_t t;
@@ -150,8 +144,6 @@ static void test_investigate(void)
     CHECK(hypotf(t.fish[0].x - x0, t.fish[0].y - y0) > 8.0f);
     CHECK(all_ok(&t));
 }
-
-/* ---- Hide -------------------------------------------------------------- */
 
 static void test_hide(void)
 {
@@ -177,8 +169,6 @@ static void test_cover_points_are_reachable(void)
         CHECK(tank_cover[c][1] >= SWIM_Y_MIN && tank_cover[c][1] <= SWIM_Y_MAX);
     }
 }
-
-/* ---- The whole thing --------------------------------------------------- */
 
 static void test_shy_and_bold_react_differently(void)
 {
