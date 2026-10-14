@@ -21,6 +21,8 @@ learn how that works. Inspired by
 
 ## Hardware
 
+<img src="docs/images/live_photo.jpg" alt="The tank running on the board at night" width="640">
+
 A Hosyond / LCDWIKI ES3C28P: an ESP32-S3 with a 2.8" 320x240 screen (ILI9341V),
 capacitive touch (FT6336G), 16 MB of flash and 8 MB of PSRAM. Pins are in
 `firmware/main/board.h`.
